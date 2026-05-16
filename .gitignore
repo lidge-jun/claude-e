@@ -2,4 +2,5 @@
 .DS_Store
 *.log
 *.tmp
+*.tgz
 node_modules/
