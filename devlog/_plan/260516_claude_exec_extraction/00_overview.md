@@ -3,28 +3,29 @@ created: 2026-05-16
 status: planning
 tags: [claude-exec, cli-jaw, rust, runtime]
 ---
-# claude-exec Extraction
+# claude-e Extraction
 
 ## Decision
 
-Use `claude-exec` as the standalone repository and binary name.
+Use `claude-e` as the standalone GitHub repository and npm package name.
 
 Reason:
 
-- It mirrors the mental model of `codex exec`.
-- It describes a non-interactive model execution surface instead of an internal Jaw helper.
-- It leaves room for reuse by runtimes other than cli-jaw.
+- It gives the public command a short, memorable surface.
+- It avoids the already-owned npm package name `claude-exec`.
+- It still keeps `claude-exec` as a long compatibility alias for users who prefer the explicit `codex exec` mental model.
 
 ## Initial Scope
 
 - Extract the Rust PTY helper from `cli-jaw/native/jaw-claude-i`.
-- Rename the package and primary binary to `claude-exec`.
+- Rename the npm package and GitHub repository to `claude-e`.
+- Keep `claude-exec` as a compatibility binary alias.
 - Keep compatibility binary aliases:
   - `claude-e`
   - `claude-i`
   - `jaw-claude-i`
-- Add default `claude -p`-style PTY mode so `claude-exec "prompt"` and
-  `claude-e "prompt"` can be used like a print-mode Claude command without
+- Add default `claude -p`-style PTY mode so `claude-e "prompt"` and
+  `claude-exec "prompt"` can be used like a print-mode Claude command without
   leaving the interactive wrapper path.
 - Keep the stdout protocol stable for cli-jaw:
   - `jaw_runtime` lifecycle events.
@@ -44,7 +45,7 @@ Reason:
 
 ## Print-Compatible PTY Follow-up
 
-- Top-level `claude-exec ...` and `claude-e ...` parse `claude -p`-style args
+- Top-level `claude-e ...` and `claude-exec ...` parse `claude -p`-style args
   and then call the same PTY-backed runtime used by `run`.
 - `claude-e p ...` and `claude-e print ...` are accepted as explicit aliases
   for the same top-level print-compatible mode.
@@ -63,9 +64,8 @@ Reason:
   `CLAUDE_BIN`; otherwise it resolves `claude` from PATH.
 - Internal `jaw_runtime` lifecycle events are suppressed from stdout in this
   top-level print-compatible mode.
-- npm one-shot behavior differs by package name: `npx claude-exec "prompt"`
-  works for the `claude-exec` package, while `claude-e` as a one-shot package
-  name needs a separate alias package or `npx -p claude-exec claude-e "prompt"`.
+- npm one-shot behavior now uses the short public package name:
+  `npx claude-e "prompt"`.
 - npm packaging now has a Cargo-backed `postinstall`, local release scripts,
   `npm publish --dry-run` validation, semver release helpers, preview release
   helpers, and GitHub workflows for Rust verification, npm package dry-runs, and
@@ -88,6 +88,7 @@ Required before considering the extraction usable:
 cargo fmt --check
 cargo test --locked
 cargo build --release --locked
+target/release/claude-e --help
 target/release/claude-exec --help
 target/release/jaw-claude-i --help
 ```

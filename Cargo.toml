@@ -1,10 +1,10 @@
 [package]
 name = "claude-exec"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
-description = "Codex exec-style PTY wrapper for interactive Claude Code"
+description = "PTY-backed exec wrapper for Claude Code"
 license = "MIT"
-repository = "https://github.com/lidge-jun/claude-exec"
+repository = "https://github.com/lidge-jun/claude-e"
 default-run = "claude-exec"
 publish = false
 

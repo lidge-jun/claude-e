@@ -1,6 +1,6 @@
 # structure/
 
-Keep this folder aligned with the live `claude-exec` command surface and runtime contract.
+Keep this folder aligned with the live `claude-e` command surface and runtime contract.
 
 - Update `INDEX.md` whenever a structure document is added, removed, renamed, or re-scoped.
 - Update `cli_surface.md` when command names, aliases, flags, or examples change.

@@ -5,7 +5,7 @@
 #   ./scripts/release-preview.sh 1.2.0    # explicit preview base version
 set -euo pipefail
 
-PKG_NAME="claude-exec"
+PKG_NAME="claude-e"
 
 cd "$(dirname "$0")/.."
 
@@ -60,12 +60,12 @@ echo "$CHANGELOG" | head -10
 echo
 
 npm version "$PREVIEW_VERSION" --no-git-tag-version
+VERSION="$(node -p "require('./package.json').version")"
+node scripts/sync-cargo-version.mjs "$VERSION"
 npm run verify
 npm run publish:dry-run
 
-VERSION="$(node -p "require('./package.json').version")"
-
-git add package.json
+git add Cargo.toml package.json
 [ -f package-lock.json ] && git add package-lock.json
 [ -f npm-shrinkwrap.json ] && git add npm-shrinkwrap.json
 git commit -m "[agent] chore: preview v$VERSION" --allow-empty

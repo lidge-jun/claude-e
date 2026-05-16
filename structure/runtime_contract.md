@@ -2,12 +2,13 @@
 
 ## Default Print-Compatible PTY Mode
 
-When no `run` or `exec` subcommand is present, `claude-exec` and `claude-e`
+When no `run` or `exec` subcommand is present, `claude-e` and `claude-exec`
 parse a `claude -p`-style invocation and execute the existing PTY runtime:
 
 ```text
 claude-e [claude -p style args] <prompt>
 claude-e p [claude -p style args] <prompt>
+claude-exec [claude -p style args] <prompt>
 ```
 
 This mode still allocates a PTY and injects the prompt through Claude Code's
@@ -42,7 +43,7 @@ then `claude`.
 
 ## PTY Spawn
 
-`claude-exec` starts the underlying Claude CLI in a PTY. The Claude binary defaults to `claude`, but embedding runtimes should pass an explicit path with `--claude-bin` to avoid PATH snapshot drift.
+`claude-e` starts the underlying Claude CLI in a PTY. The Claude binary defaults to `claude`, but embedding runtimes should pass an explicit path with `--claude-bin` to avoid PATH snapshot drift.
 
 Fresh runs add a generated `--session-id` unless print-compatible mode received
 `--no-session-persistence`. Resume runs pass `--resume <session-id>`. A
@@ -56,7 +57,7 @@ The wrapper writes a temporary Claude settings file with hook commands. Hooks re
 
 Stdout is JSONL.
 
-`claude-exec` emits runtime events using the existing cli-jaw envelope:
+`claude-e` emits runtime events using the existing cli-jaw envelope:
 
 ```json
 {"type":"jaw_runtime","event":"runtime_started","runId":"run_12345678"}
@@ -88,9 +89,10 @@ the user record is flushed.
 
 ## Compatibility Guarantees
 
-- `claude-exec ...` and `claude-e ...` without `run`/`exec` preserve the `claude -p` command shape while staying PTY-backed.
-- `claude-exec run` remains stable for cli-jaw integration.
-- `claude-exec` is the preferred cli-jaw helper binary.
+- `claude-e ...` and `claude-exec ...` without `run`/`exec` preserve the `claude -p` command shape while staying PTY-backed.
+- `claude-e run` and `claude-exec run` remain stable for cli-jaw integration.
+- `claude-e` is the preferred npm package and public command name.
+- `claude-exec` remains a compatibility helper binary.
 - `jaw-claude-i` remains a compatibility binary while cli-jaw migration is active.
 - `claude-i` remains a compatibility binary while settings and saved cli-jaw provider ids still reference it.
 - `jaw_runtime` remains emitted until cli-jaw supports an additive `claude_exec_runtime` event family.

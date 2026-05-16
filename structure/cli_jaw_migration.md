@@ -2,7 +2,7 @@
 
 ## Goal
 
-Move cli-jaw from the internal `claude-i` / `jaw-claude-i` naming to an external `claude-exec` runtime without breaking saved settings, session buckets, doctor output, tests, or installed helper paths.
+Move cli-jaw from the internal `claude-i` / `jaw-claude-i` naming to the external `claude-e` npm package and PTY runtime without breaking saved settings, session buckets, doctor output, tests, or installed helper paths.
 
 ## Current Inventory
 
@@ -20,8 +20,9 @@ This is not a huge runtime surface, but the string appears in many docs and test
 
 ## Phase 0: Extraction
 
-- Create standalone `700_projects/claude-exec`.
-- Build `claude-exec`, `claude-i`, and `jaw-claude-i` from the same Rust source.
+- Create standalone `700_projects/claude-e`.
+- Publish npm package `claude-e`.
+- Build `claude-e`, `claude-exec`, `claude-i`, and `jaw-claude-i` from the same Rust source.
 - Keep `jaw_runtime` output stable.
 - Keep cli-jaw source behavior unchanged except for explicit `--claude-bin` passing.
 
@@ -30,7 +31,8 @@ This is not a huge runtime surface, but the string appears in many docs and test
 In cli-jaw:
 
 - Add `CLAUDE_EXEC_BIN` as the preferred explicit env var.
-- Prefer embedded npm `claude-exec`, then `claude-exec` on PATH.
+- Prefer embedded npm `claude-e`, then `claude-e` on PATH.
+- Keep `claude-exec` on PATH as a compatibility fallback.
 - Fall back to `JAW_CLAUDE_I_BIN`, `jaw-claude-i`, `claude-i`, and legacy `native/jaw-claude-i/target/...`.
 - Rename helper candidate function from `getClaudeIHelperCandidates` to `getClaudeExecCandidates`, leaving an exported deprecated alias for tests and older callers.
 
@@ -39,9 +41,9 @@ In cli-jaw:
 Add a new provider key:
 
 ```ts
-'claude-exec': {
-  label: 'Claude Exec',
-  binary: 'claude-exec',
+'claude-e': {
+  label: 'Claude E',
+  binary: 'claude-e',
   experimental: true,
   ...
 }
@@ -51,16 +53,16 @@ Keep `claude-i` as a hidden/deprecated alias for one release line.
 
 Settings migration:
 
-- If `settings.cli === 'claude-i'`, migrate to `claude-exec`.
-- If `perCli['claude-i']` exists and `perCli['claude-exec']` is absent, copy the config.
+- If `settings.cli === 'claude-i'`, migrate to `claude-e`.
+- If `perCli['claude-i']` exists and `perCli['claude-e']` is absent, copy the config.
 - Keep session buckets separate at first. Add an explicit bucket migration only after resume smoke tests pass.
 
 ## Phase 3: Runtime/Event Rename
 
 Additive first:
 
-- Rename `src/agent/claude-i-runtime.ts` to `claude-exec-runtime.ts`.
-- Broadcast both `agent:claude-exec:*` and deprecated `agent:claude-i:*` for one compatibility window.
+- Rename `src/agent/claude-i-runtime.ts` to `claude-e-runtime.ts`.
+- Broadcast both `agent:claude-e:*` and deprecated `agent:claude-i:*` for one compatibility window.
 - Accept both `jaw_runtime` and future `claude_exec_runtime` if the standalone wrapper adds it.
 
 Removal later:
@@ -69,26 +71,26 @@ Removal later:
 
 ## Phase 4: Build and Docs
 
-- Replace `build:claude-i` with `build:claude-exec`.
-- Replace `test:claude-i` with `test:claude-exec`.
+- Replace `build:claude-i` with `build:claude-e`.
+- Replace `test:claude-i` with `test:claude-e`.
 - Keep deprecated npm script aliases for at least one release:
-  - `build:claude-i -> npm run build:claude-exec`
-  - `test:claude-i -> npm run test:claude-exec`
+  - `build:claude-i -> npm run build:claude-e`
+  - `test:claude-i -> npm run test:claude-e`
 - Update `structure/INDEX.md`, `structure/agent_spawn.md`, `structure/commands.md`, `structure/prompt_flow.md`, `structure/stream-events.md`, and `structure/str_func.md`.
 
 ## Phase 5: Remove Embedded Rust
 
-Only after `claude-exec` is published or installed locally:
+Only after `claude-e` is published or installed locally:
 
 - Stop building `native/jaw-claude-i` in cli-jaw release gates.
 - Keep the folder for one release as a vendored fallback or remove it behind a clear changelog entry.
-- Prefer an installed `claude-exec` binary and explicit `CLAUDE_EXEC_BIN`.
+- Prefer an installed `claude-e` binary and explicit `CLAUDE_EXEC_BIN`.
 
 ## Recommended First cli-jaw Diff
 
 The first safe cli-jaw code diff should be narrow:
 
-1. Add `CLAUDE_EXEC_BIN`, embedded npm `claude-exec`, and PATH `claude-exec` to detection before legacy helper names.
+1. Add `CLAUDE_EXEC_BIN`, embedded npm `claude-e`, PATH `claude-e`, and PATH `claude-exec` to detection before legacy helper names.
 2. Pass explicit `--claude-bin <resolved claude path>` in `spawn.ts`.
 3. Keep provider id `claude-i` unchanged.
 4. Add tests proving detection priority and `--claude-bin` args.

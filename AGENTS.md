@@ -1,12 +1,12 @@
-# claude-exec
+# claude-e
 
-`claude-exec` is a standalone Rust runtime wrapper for Claude Code.
+`claude-e` is a standalone npm-distributed Rust runtime wrapper for Claude Code.
 
 ## Source Rules
 
 - Keep generated build output out of git. `target/` must stay ignored.
 - Prefer `cargo fmt`, `cargo test`, and `cargo build --release` before publishing runtime changes.
-- Keep the primary binary name `claude-exec`. Compatibility aliases `claude-i` and `jaw-claude-i` are intentional until cli-jaw fully migrates.
+- Keep the public npm package and short command name `claude-e`. The long `claude-exec` binary remains an intentional compatibility alias, alongside `claude-i` and `jaw-claude-i`, until cli-jaw fully migrates.
 - Preserve the stdout JSONL contract unless a migration document in `structure/` and `devlog/` describes the compatibility plan.
 
 ## Documentation

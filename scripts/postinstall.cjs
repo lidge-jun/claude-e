@@ -9,7 +9,7 @@ const root = join(__dirname, '..');
 const built = join(root, 'target', 'release', process.platform === 'win32' ? 'claude-exec.exe' : 'claude-exec');
 
 function log(message) {
-  console.log(`[claude-exec:postinstall] ${message}`);
+  console.log(`[claude-e:postinstall] ${message}`);
 }
 
 if (process.env.CLAUDE_EXEC_SKIP_POSTINSTALL === '1' || process.env.CLAUDE_EXEC_SKIP_BUILD === '1') {
@@ -24,8 +24,8 @@ if (existsSync(built)) {
 
 const cargo = spawnSync('cargo', ['--version'], { encoding: 'utf8', stdio: 'pipe' });
 if (cargo.status !== 0) {
-  console.error('[claude-exec:postinstall] cargo is required to build the npm package from source.');
-  console.error('[claude-exec:postinstall] Install Rust from https://rustup.rs, or set CLAUDE_EXEC_SKIP_BUILD=1 and provide a built binary separately.');
+  console.error('[claude-e:postinstall] cargo is required to build the npm package from source.');
+  console.error('[claude-e:postinstall] Install Rust from https://rustup.rs, or set CLAUDE_EXEC_SKIP_BUILD=1 and provide a built binary separately.');
   process.exit(1);
 }
 
@@ -37,7 +37,7 @@ const build = spawnSync('cargo', ['build', '--release', '--locked'], {
 });
 
 if (build.status !== 0) {
-  console.error(`[claude-exec:postinstall] cargo build failed with status ${build.status}`);
+  console.error(`[claude-e:postinstall] cargo build failed with status ${build.status}`);
   process.exit(build.status || 1);
 }
 

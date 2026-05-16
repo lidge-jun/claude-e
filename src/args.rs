@@ -3,9 +3,9 @@ use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "claude-exec",
+    name = "claude-e",
     version,
-    about = "Codex exec-style PTY wrapper for interactive Claude Code"
+    about = "PTY-backed exec wrapper for Claude Code"
 )]
 pub struct Cli {
     #[command(subcommand)]

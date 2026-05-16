@@ -1,7 +1,7 @@
 ---
 created: 2026-05-16
 status: planning
-tags: [claude-exec, cli-jaw, migration]
+tags: [claude-e, cli-jaw, migration]
 ---
 # cli-jaw Naming Migration Plan
 
@@ -10,10 +10,10 @@ tags: [claude-exec, cli-jaw, migration]
 The `claude-i` surface is not enormous, but it is cross-cutting. The safe path is alias-first:
 
 ```text
-claude-i provider -> claude-exec provider
-jaw-claude-i binary -> claude-exec binary
+claude-i provider -> claude-e provider
+jaw-claude-i binary -> claude-e binary
 JAW_CLAUDE_I_BIN env -> CLAUDE_EXEC_BIN env
-agent:claude-i:* events -> agent:claude-exec:* events
+agent:claude-i:* events -> agent:claude-e:* events
 ```
 
 Each arrow should be additive before it is destructive.
@@ -21,11 +21,11 @@ Each arrow should be additive before it is destructive.
 ## Phase Order
 
 1. Keep cli-jaw provider id `claude-i` for now.
-2. Teach cli-jaw detection to prefer `CLAUDE_EXEC_BIN`, embedded npm `claude-exec`, and PATH `claude-exec`.
+2. Teach cli-jaw detection to prefer `CLAUDE_EXEC_BIN`, embedded npm `claude-e`, PATH `claude-e`, and compatibility PATH `claude-exec`.
 3. Keep `JAW_CLAUDE_I_BIN`, `jaw-claude-i`, and `claude-i` as compatibility fallbacks.
-4. Add provider id `claude-exec` only after detection and doctor are stable.
-5. Migrate saved settings from `claude-i` to `claude-exec`.
-6. Broadcast `agent:claude-exec:*` while still broadcasting deprecated `agent:claude-i:*`.
+4. Add provider id `claude-e` only after detection and doctor are stable.
+5. Migrate saved settings from `claude-i` to `claude-e`.
+6. Broadcast `agent:claude-e:*` while still broadcasting deprecated `agent:claude-i:*`.
 7. Update docs and tests.
 8. Remove embedded `native/jaw-claude-i` after external install/publish is reliable.
 

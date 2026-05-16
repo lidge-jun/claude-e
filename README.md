@@ -1,52 +1,137 @@
-# claude-exec
+# claude-e
 
-`claude-exec` is a non-interactive execution wrapper for Claude Code.
+[![Tests](https://github.com/lidge-jun/claude-e/actions/workflows/test.yml/badge.svg)](https://github.com/lidge-jun/claude-e/actions/workflows/test.yml)
+[![npm version](https://img.shields.io/npm/v/claude-e.svg)](https://www.npmjs.com/package/claude-e)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Rust](https://img.shields.io/badge/runtime-Rust-orange.svg)](Cargo.toml)
 
-It has two surfaces:
+`claude-e` is a PTY-backed execution wrapper for Claude Code.
 
-- `claude-exec ...` / `claude-e ...`: `claude -p`-style command surface backed by the interactive PTY runtime. Prompt arguments, piped stdin, `p` / `print` aliases, print-only formatting flags, session controls, and common Claude runtime flags are accepted without requiring the explicit `run` subcommand.
-- `claude-exec run ...`: interactive PTY runtime for agent systems. It provides stdin prompt input, JSONL runtime events, transcript replay, timeout handling, resume support, and explicit Claude binary resolution.
-
-The code was extracted from cli-jaw's native `jaw-claude-i` helper. The primary public name is now `claude-exec`; `claude-i` and `jaw-claude-i` remain compatibility binary aliases.
-
-## Build
+It gives Claude a `claude -p`-style command surface while still driving the
+interactive Claude Code runtime underneath. That matters when an agent system
+needs the real interactive Claude behavior, but also needs a predictable
+single-command interface, JSON output, timeouts, resume wiring, and explicit
+binary resolution.
 
 ```bash
-cargo build --release
+npx claude-e "your prompt here"
+npx claude-e p --model opus "explain quicksort to a 10-year-old"
+npx claude-e --output-format json "summarize this commit" < commit.diff
+npx claude-e --output-format stream-json "audit src/" --verbose | jq .
 ```
 
-This builds four binaries from the same source:
+## Why This Exists
 
-```text
-target/release/claude-exec
-target/release/claude-e
-target/release/claude-i
-target/release/jaw-claude-i
+Claude Code is strongest as an interactive tool. Agent runtimes often need the
+opposite shape: spawn one process, send one prompt, collect structured output,
+classify failures, and move on.
+
+`claude-e` bridges that gap:
+
+| Need | What `claude-e` does |
+|---|---|
+| `claude -p`-like usage | Accepts prompt args, piped stdin, `p` / `print`, `-p`, and `--print`. |
+| Real Claude Code behavior | Uses a PTY and injects the prompt through the interactive path. |
+| Agent-friendly output | Normalizes transcript replay into `text`, `json`, or `stream-json`. |
+| Embedding stability | Supports `run` / `exec`, JSONL runtime events, timeout exit codes, and resume. |
+| Launchd/server safety | Lets callers pass an explicit `--claude-bin` instead of relying on PATH. |
+| cli-jaw migration | Keeps `claude-exec`, `claude-i`, and `jaw-claude-i` compatibility bins. |
+
+## Install
+
+```bash
+npm install -g claude-e
 ```
 
-## Run
+One-shot usage:
 
-Default mode mirrors the `claude -p` command shape while still using the PTY wrapper:
+```bash
+npx claude-e "your prompt here"
+```
+
+From source:
+
+```bash
+git clone https://github.com/lidge-jun/claude-e.git
+cd claude-e
+npm install
+cargo build --release --locked
+```
+
+The npm package builds the Rust release binary during `postinstall`. Set
+`CLAUDE_EXEC_SKIP_BUILD=1` only when another packaging layer provides the binary.
+
+## Command Surface
+
+The short command is the public face:
+
+```bash
+claude-e "your prompt here"
+claude-e p "your prompt here"
+claude-e print "your prompt here"
+claude-e -p "your prompt here"
+```
+
+The long command remains available for compatibility:
 
 ```bash
 claude-exec "your prompt here"
-claude-e "your prompt here"
-claude-e p "your prompt here"
-
-claude-exec --output-format json "summarize this commit" < commit.diff
-claude-e --output-format stream-json "audit src/" --verbose | jq .
-claude-exec --model opus "explain quicksort to a 10-year-old"
-claude-e p --input-format stream-json --output-format json < messages.jsonl
+claude-exec run --claude-bin "$(command -v claude)" -- --model opus
+claude-exec exec --claude-bin "$(command -v claude)" -- --model opus
 ```
 
-The PTY-backed print-compatible Claude binary defaults to `claude`. Override it with
-`CLAUDE_EXEC_CLAUDE_BIN=/path/to/claude` or `CLAUDE_BIN=/path/to/claude`.
+The package currently exposes four bins from the same Rust entrypoint:
 
-The PTY wrapper mode remains explicit:
+| Bin | Status | Purpose |
+|---|---|---|
+| `claude-e` | Primary | Short npm command and `claude -p`-style surface. |
+| `claude-exec` | Compatibility | Long descriptive alias retained for existing integrations. |
+| `claude-i` | Transitional | Existing cli-jaw provider/runtime compatibility. |
+| `jaw-claude-i` | Legacy | Existing cli-jaw helper name compatibility. |
+
+## Print-Compatible Examples
+
+Plain text:
+
+```bash
+claude-e "write a two-line commit summary"
+```
+
+JSON result:
+
+```bash
+git diff --cached | claude-e --output-format json "summarize this staged diff"
+```
+
+Stream JSON:
+
+```bash
+claude-e --output-format stream-json "audit src/" --verbose | jq .
+```
+
+Explicit Claude binary:
+
+```bash
+CLAUDE_EXEC_CLAUDE_BIN="$(command -v claude)" \
+  claude-e --model opus "explain this repo architecture"
+```
+
+Session-shaped run:
+
+```bash
+claude-e \
+  --session-id 00000000-0000-4000-8000-000000000001 \
+  --output-format stream-json \
+  "continue this investigation from the existing Claude session"
+```
+
+## PTY Runtime Mode
+
+Agent systems can use the explicit runtime command:
 
 ```bash
 printf 'Say hello in one short sentence.\n' \
-  | cargo run --quiet --bin claude-exec -- run \
+  | claude-e run \
       --jsonl \
       --output-format stream-json \
       --timeout-ms 600000 \
@@ -57,96 +142,119 @@ printf 'Say hello in one short sentence.\n' \
       --dangerously-skip-permissions
 ```
 
-`run` also has a visible `exec` alias:
+`exec` is a visible alias for `run`:
 
 ```bash
-printf 'Say hello.\n' | claude-exec exec --claude-bin "$(command -v claude)" -- --model claude-opus-4-6
+printf 'Say hello.\n' \
+  | claude-e exec --claude-bin "$(command -v claude)" -- --model opus
 ```
 
-## Install Locally
+## Supported Flags
+
+Wrapper-owned flags:
+
+| Flag | Behavior |
+|---|---|
+| `--input-format text\|stream-json` | Reads plain stdin or extracts user text from JSONL messages. |
+| `--output-format text\|json\|stream-json` | Selects transcript output normalization. |
+| `--timeout-ms` | Runtime timeout in milliseconds. |
+| `--claude-bin` | Claude CLI binary or absolute path. |
+| `--cwd` | Working directory for the Claude PTY process. |
+| `--cols`, `--rows` | PTY dimensions. |
+| `--session-id` | Uses a specific session id in print-compatible mode. |
+| `--resume`, `-r` | Resumes a Claude session in the PTY path. |
+| `--no-session-persistence` | Suppresses generated session ids. |
+| `--json-schema` | Appends a JSON-only schema instruction to the prompt. |
+| `--auto-accept-workspace-trust` | Accepts Claude's pre-SessionStart trust prompt when it appears. |
+
+Forwarded Claude flags include `--model`, `--effort`, `--permission-mode`,
+`--add-dir`, `--allowed-tools`, `--disallowed-tools`, `--tools`, `--mcp-config`,
+`--settings`, `--system-prompt`, `--append-system-prompt`, `--plugin-dir`,
+`--plugin-url`, browser flags, MCP debug flags, and related Claude global
+controls.
+
+Print-only compatibility flags such as `--verbose`,
+`--include-partial-messages`, `--include-hook-events`,
+`--replay-user-messages`, `--fallback-model`, and `--max-budget-usd` are
+accepted so command shapes port cleanly from print-mode Claude.
+
+## Output Contract
+
+Default print-compatible mode suppresses wrapper diagnostics from stdout and
+returns the requested user-facing format.
+
+Explicit `run` / `exec` mode emits JSONL. Runtime lifecycle records use the
+existing cli-jaw compatibility envelope:
+
+```json
+{"type":"jaw_runtime","event":"runtime_started","runId":"run_12345678"}
+```
+
+Claude transcript records are tailed and normalized into Claude-like stream JSON.
+On completion, the wrapper can synthesize a result record from the last assistant
+message.
+
+## Exit Codes
+
+| Code | Meaning |
+|---:|---|
+| `0` | Normal completion. |
+| `1` | Underlying Claude exited unsuccessfully without a more specific wrapper classification. |
+| `2` | Graceful interrupt; session metadata can be resumable. |
+| `4` | Claude spawn or PTY write failure. |
+| `5` | SessionStart hook failure, timeout, or early Claude exit before SessionStart. |
+| `6` | Runtime timeout. |
+| `7` | Prompt injection transcript verification failure. |
+| `11` | Claude StopFailure hook. |
+| `13` | Hook temp dir or settings generation failure. |
+| `16` | stdin read, size, empty prompt, or prompt sanitization failure. |
+
+## Development
 
 ```bash
-cargo install --path . --locked
+npm run fmt:check
+npm run test
+npm run build
+npm run verify
 ```
 
-For development without installing, the `bin/` wrappers run `target/release/claude-exec` when present and otherwise fall back to `cargo run`.
-
-The package also supports npm installation from source. The npm `postinstall`
-script builds the Rust release binary with Cargo, and the installed bin wrappers
-execute that package-local binary:
+Smoke test with local Claude auth:
 
 ```bash
-npm install -g claude-exec
-npx claude-exec "your prompt here"
-npx -p claude-exec claude-e p --model opus "explain quicksort"
+bash scripts/smoke.sh
 ```
 
-Set `CLAUDE_EXEC_SKIP_BUILD=1` only when you intentionally provide a built
-binary through `CLAUDE_EXEC_BIN` or a separate packaging layer. Without a built
-binary, the wrapper requires Cargo at runtime and prints an explicit error if
-Cargo is missing.
+## Release
 
-Packaging scripts:
+Dry-run the exact npm publish surface:
 
 ```bash
-npm run verify        # cargo fmt --check + cargo test + cargo build --release
-npm run pack:dry      # inspect the npm package contents
-npm run publish:dry-run # validate the actual npm publish surface without publishing
-npm run release:check # full local release dry run
-npm run release:npm   # publish the current package version to npm with --access public
-npm run release:patch # bump patch, commit, tag, publish to npm, create GitHub Release
-npm run release:minor # bump minor, commit, tag, publish to npm, create GitHub Release
-npm run release:major # bump major, commit, tag, publish to npm, create GitHub Release
-npm run release:preview # publish a preview dist-tag prerelease
+npm run publish:dry-run
 ```
 
-The GitHub workflows run Rust tests/builds plus npm package dry-runs on push/PR,
-and publish to npm from GitHub Releases when `NPM_TOKEN` is configured. The
-manual `npm Publish` workflow can also run as a dry run, or publish when
-`dry_run` is set to `false`.
+Release helpers:
 
-## Contract
+```bash
+npm run release:check   # full local release dry run
+npm run release:npm     # publish the current package version
+npm run release:patch   # bump patch, commit, tag, publish, create GitHub Release
+npm run release:minor   # bump minor, commit, tag, publish, create GitHub Release
+npm run release:major   # bump major, commit, tag, publish, create GitHub Release
+npm run release:preview # publish preview dist-tag prerelease
+```
 
-Default print-compatible contract:
+GitHub Actions runs Rust verification and npm publish dry-runs on push/PR. The
+manual `npm Publish` workflow can run dry or publish when npm credentials are
+configured.
 
-- Parses `claude -p`-style arguments.
-- Builds a prompt from positional prompt text plus piped stdin.
-- Runs the existing interactive Claude PTY wrapper with runtime diagnostics suppressed from stdout.
-- Accepts `claude-e p ...`, `claude-e print ...`, `claude-e -p ...`, and `claude-e --print ...` as aliases for the same PTY-backed print-compatible mode.
-- Intercepts `--input-format text|stream-json`, `--output-format text|json|stream-json`, `--session-id`, `--no-session-persistence`, `--json-schema`, and wrapper-local controls for output and session normalization.
-- Accepts print-only flags such as `--verbose`, `--include-partial-messages`, `--include-hook-events`, `--replay-user-messages`, `--fallback-model`, and `--max-budget-usd` for command-shape compatibility. The PTY path consumes flags it cannot faithfully enforce.
-- Forwards common Claude runtime flags such as `--model`, `--effort`, `--permission-mode`, `--add-dir`, `--allowed-tools`, `--tools`, `--mcp-config`, `--settings`, `--system-prompt`, `--append-system-prompt`, `--plugin-dir`, and `--plugin-url`.
-- Supports `--flag=value` spelling for recognized value flags. Variadic Claude flags consume one value per occurrence; repeat the flag or use `--` before prompt text when the boundary is ambiguous.
-
-PTY `run` input:
-
-- Prompt is read from stdin.
-- Empty stdin is rejected.
-- Prompt input is capped at 10 MB.
-
-PTY `run` output:
-
-- JSONL is written to stdout.
-- Runtime lifecycle records use `{"type":"jaw_runtime", ...}` for cli-jaw compatibility.
-- Claude transcript records are normalized into Claude-like stream JSON.
-- `--auto-accept-workspace-trust` watches the interactive PTY screen before `SessionStart` and accepts Claude's workspace trust prompt when it appears.
-
-Exit codes:
-
-- `0`: normal completion.
-- `2`: graceful interrupt; session can be resumable.
-- `4`: Claude spawn or PTY write failure.
-- `5`: SessionStart failure or timeout. Timeout errors include a compact PTY screen snapshot when available.
-- `6`: run timeout.
-- `7`: prompt injection verification failure. The verification accepts a new `user` transcript record or an `assistant` transcript record after the prompt offset, because some Claude builds begin responding before the user record is flushed.
-- `11`: Claude StopFailure hook.
-- `13`: hook setup failure.
-- `16`: prompt read or validation failure.
-
-## Docs
+## Architecture Docs
 
 - [structure/INDEX.md](structure/INDEX.md)
 - [structure/cli_surface.md](structure/cli_surface.md)
 - [structure/runtime_contract.md](structure/runtime_contract.md)
 - [structure/cli_jaw_migration.md](structure/cli_jaw_migration.md)
 - [devlog/_plan/260516_claude_exec_extraction/00_overview.md](devlog/_plan/260516_claude_exec_extraction/00_overview.md)
+
+## License
+
+MIT

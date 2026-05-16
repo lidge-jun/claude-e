@@ -7,7 +7,7 @@
 #   ./scripts/release.sh 1.2.0    # explicit version
 set -euo pipefail
 
-PKG_NAME="claude-exec"
+PKG_NAME="claude-e"
 
 cd "$(dirname "$0")/.."
 
@@ -44,6 +44,7 @@ else
 fi
 
 VERSION="$(node -p "require('./package.json').version")"
+node scripts/sync-cargo-version.mjs "$VERSION"
 echo "New version: $VERSION"
 
 PREV_TAG="$(git tag --sort=-v:refname | grep -E '^v[0-9]' | head -1 || true)"
@@ -63,7 +64,7 @@ echo
 npm run verify
 npm run publish:dry-run
 
-git add package.json
+git add Cargo.toml package.json
 [ -f package-lock.json ] && git add package-lock.json
 [ -f npm-shrinkwrap.json ] && git add npm-shrinkwrap.json
 git commit -m "[agent] chore: release v$VERSION" --allow-empty

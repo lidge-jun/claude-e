@@ -2,9 +2,9 @@
 
 ## Binary Names
 
-`claude-exec` is the primary binary.
+`claude-e` is the primary public npm command and package name.
 
-`claude-e` is a short public alias for the same binary behavior.
+`claude-exec` is the long descriptive compatibility alias for the same binary behavior.
 
 Two compatibility names are intentionally built from the same library entrypoint:
 
@@ -13,12 +13,13 @@ Two compatibility names are intentionally built from the same library entrypoint
 
 ## Default `claude -p`-Style PTY Mode
 
-Without a `run` or `exec` subcommand, `claude-exec` and `claude-e` expose a
+Without a `run` or `exec` subcommand, `claude-e` and `claude-exec` expose a
 `claude -p`-style surface while still running the interactive PTY wrapper:
 
 ```text
 claude-e [claude -p style args] <prompt>
 claude-e p [claude -p style args] <prompt>
+claude-exec [claude -p style args] <prompt>
 ```
 
 The wrapper parses prompt arguments and piped stdin, suppresses internal
@@ -29,13 +30,13 @@ Claude process.
 Examples:
 
 ```bash
-claude-exec "your prompt here"
 claude-e "your prompt here"
 claude-e p "your prompt here"
+claude-exec "your prompt here"
 
-claude-exec --output-format json "summarize this commit" < commit.diff
+claude-e --output-format json "summarize this commit" < commit.diff
 claude-e --output-format stream-json "audit src/" --verbose | jq .
-claude-exec --model opus "explain quicksort to a 10-year-old"
+claude-e --model opus "explain quicksort to a 10-year-old"
 claude-e p --input-format stream-json --output-format json < messages.jsonl
 ```
 
@@ -87,12 +88,14 @@ Primary form:
 
 ```bash
 claude-exec run [wrapper flags] -- [claude args]
+claude-e run [wrapper flags] -- [claude args]
 ```
 
 Semantic alias:
 
 ```bash
 claude-exec exec [wrapper flags] -- [claude args]
+claude-e exec [wrapper flags] -- [claude args]
 ```
 
 `run` remains the stable compatibility form because cli-jaw currently emits `jaw-claude-i run ...`.
@@ -132,19 +135,20 @@ The intended mental model is:
 
 ```text
 codex exec   -> non-interactive Codex execution surface
-claude-exec  -> non-interactive Claude execution surface backed by interactive Claude Code
+claude-e     -> short non-interactive Claude execution surface backed by interactive Claude Code
+claude-exec  -> long compatibility alias for the same runtime
 ```
 
 ## npm Packaging
 
-The npm package exposes these bins from the same Rust entrypoint:
+The `claude-e` npm package exposes these bins from the same Rust entrypoint:
 
-- `claude-exec`
 - `claude-e`
+- `claude-exec`
 - `claude-i`
 - `jaw-claude-i`
 
-`npm install -g claude-exec` runs `scripts/postinstall.cjs`, which builds the
+`npm install -g claude-e` runs `scripts/postinstall.cjs`, which builds the
 release binary with Cargo. The bin wrappers execute `target/release/claude-exec`
 when it exists and fall back to `cargo run` only for source checkouts. Set
 `CLAUDE_EXEC_SKIP_BUILD=1` only when another packaging layer provides the binary.

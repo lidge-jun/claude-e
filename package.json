@@ -1,5 +1,5 @@
 {
-  "name": "claude-exec",
+  "name": "claude-e",
   "version": "0.1.1",
   "description": "PTY-backed exec wrapper for Claude Code with claude -p-compatible CLI and cli-jaw runtime support",
   "keywords": [
@@ -15,11 +15,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/lidge-jun/claude-exec.git"
+    "url": "git+https://github.com/lidge-jun/claude-e.git"
   },
-  "homepage": "https://github.com/lidge-jun/claude-exec#readme",
+  "homepage": "https://github.com/lidge-jun/claude-e#readme",
   "bugs": {
-    "url": "https://github.com/lidge-jun/claude-exec/issues"
+    "url": "https://github.com/lidge-jun/claude-e/issues"
   },
   "publishConfig": {
     "access": "public"
@@ -59,6 +59,7 @@
     "Cargo.toml",
     "Cargo.lock",
     "README.md",
+    "LICENSE",
     "structure/"
   ]
 }

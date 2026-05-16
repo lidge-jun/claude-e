@@ -33,7 +33,7 @@ pub fn main_entry() {
         std::process::exit(0);
     }
     if matches!(first, Some("-V" | "--version" | "version")) {
-        println!("claude-exec {VERSION}");
+        println!("claude-e {VERSION}");
         std::process::exit(0);
     }
 
@@ -41,14 +41,14 @@ pub fn main_entry() {
         let stdin_prompt = match print_mode::read_stdin_if_piped() {
             Ok(input) => input,
             Err(e) => {
-                eprintln!("claude-exec: {e}");
+                eprintln!("claude-e: {e}");
                 std::process::exit(16);
             }
         };
         let options = match print_mode::parse_print_mode_args(raw_args, stdin_prompt) {
             Ok(options) => options,
             Err(e) => {
-                eprintln!("claude-exec: {e}");
+                eprintln!("claude-e: {e}");
                 std::process::exit(16);
             }
         };
@@ -110,14 +110,14 @@ fn is_top_level_help(args: &[std::ffi::OsString]) -> bool {
 fn print_top_level_help() {
     println!(
         "\
-claude-exec {VERSION}
+claude-e {VERSION}
 
 PTY-backed Claude print-compatible executor
 
 Usage:
-  claude-exec [options] <prompt>
   claude-e [options] <prompt>
   claude-e p [options] <prompt>
+  claude-exec [options] <prompt>
   claude-exec run [wrapper flags] -- [claude args]
 
 Default print-compatible mode:
@@ -163,7 +163,7 @@ Examples:
   claude-e \"your prompt here\"
   claude-e p --model opus \"explain quicksort\"
   claude-e --output-format stream-json \"audit src/\" --verbose
-  claude-exec --output-format json \"summarize this commit\" < commit.diff
+  claude-e --output-format json \"summarize this commit\" < commit.diff
 "
     );
 }
@@ -528,7 +528,7 @@ fn emit_stop_failure(config: &RunConfig, error: &str) {
     if config.emit_runtime_events {
         protocol::emit_stop_failure(&config.run_id, error);
     } else {
-        eprintln!("claude-exec: {error}");
+        eprintln!("claude-e: {error}");
     }
 }
 
@@ -536,7 +536,7 @@ fn emit_interrupted(config: &RunConfig, session_id: &str) {
     if config.emit_runtime_events {
         protocol::emit_interrupted(&config.run_id, session_id);
     } else {
-        eprintln!("claude-exec: interrupted");
+        eprintln!("claude-e: interrupted");
     }
 }
 
@@ -544,7 +544,7 @@ fn emit_error(config: &RunConfig, message: &str, code: i32) {
     if config.emit_runtime_events {
         protocol::emit_error(&config.run_id, message, code);
     } else {
-        eprintln!("claude-exec: {message}");
+        eprintln!("claude-e: {message}");
     }
 }
 
