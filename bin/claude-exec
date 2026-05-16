@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+BIN="$ROOT/target/release/claude-exec"
+
+if [ -x "$BIN" ]; then
+  exec "$BIN" "$@"
+fi
+
+exec cargo run --quiet --manifest-path "$ROOT/Cargo.toml" --bin claude-exec -- "$@"

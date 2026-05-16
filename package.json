@@ -1,0 +1,35 @@
+{
+  "name": "claude-exec",
+  "version": "0.1.0",
+  "description": "Codex exec-style PTY wrapper for interactive Claude Code",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lidge-jun/claude-exec.git"
+  },
+  "homepage": "https://github.com/lidge-jun/claude-exec#readme",
+  "bugs": {
+    "url": "https://github.com/lidge-jun/claude-exec/issues"
+  },
+  "bin": {
+    "claude-exec": "bin/claude-exec",
+    "claude-i": "bin/claude-i",
+    "jaw-claude-i": "bin/jaw-claude-i"
+  },
+  "scripts": {
+    "build": "cargo build --release --locked",
+    "test": "cargo test --locked",
+    "fmt": "cargo fmt",
+    "check": "cargo check --locked",
+    "smoke": "bash scripts/smoke.sh",
+    "install:local": "cargo install --path . --locked"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "Cargo.toml",
+    "Cargo.lock",
+    "README.md",
+    "structure/"
+  ]
+}
