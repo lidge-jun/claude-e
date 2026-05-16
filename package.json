@@ -1,6 +1,6 @@
 {
   "name": "claude-e",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "PTY-backed exec wrapper for Claude Code with claude -p-compatible CLI and cli-jaw runtime support",
   "keywords": [
     "claude",
