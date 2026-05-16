@@ -18,6 +18,7 @@ Without a `run` or `exec` subcommand, `claude-exec` and `claude-e` expose a
 
 ```text
 claude-e [claude -p style args] <prompt>
+claude-e p [claude -p style args] <prompt>
 ```
 
 The wrapper parses prompt arguments and piped stdin, suppresses internal
@@ -35,6 +36,7 @@ claude-e p "your prompt here"
 claude-exec --output-format json "summarize this commit" < commit.diff
 claude-e --output-format stream-json "audit src/" --verbose | jq .
 claude-exec --model opus "explain quicksort to a 10-year-old"
+claude-e p --input-format stream-json --output-format json < messages.jsonl
 ```
 
 Claude binary resolution for print-compatible PTY mode:
@@ -45,6 +47,39 @@ Claude binary resolution for print-compatible PTY mode:
 
 `p` and `print` are accepted as optional leading aliases for this same default
 mode, so `claude-e p "prompt"` is equivalent to `claude-e "prompt"`.
+`-p` and `--print` are also accepted as no-op compatibility flags.
+
+### Print-Compatible Flag Coverage
+
+Wrapper-owned flags:
+
+| Flag | Behavior |
+|---|---|
+| `--input-format text|stream-json` | Reads plain stdin or extracts user text from JSONL messages. |
+| `--output-format text|json|stream-json` | Normalizes transcript output to the requested print-style shape. |
+| `--timeout-ms`, `--claude-bin`, `--cwd`, `--cols`, `--rows` | PTY wrapper controls. |
+| `--session-id` | Uses the provided session id for the generated PTY session. |
+| `--no-session-persistence` | Suppresses generated session id; consumed by the wrapper and not forwarded to interactive Claude. |
+| `--resume` / `-r` | Resumes the provided session id in the PTY path. |
+| `--json-schema` | Appends a JSON-only schema instruction to the prompt. |
+| `--auto-accept-workspace-trust`, `--no-auto-accept-workspace-trust` | Controls pre-SessionStart trust prompt handling. |
+
+Accepted print-only compatibility flags:
+
+| Flag | Behavior |
+|---|---|
+| `--verbose`, `--include-partial-messages`, `--include-hook-events`, `--replay-user-messages` | Accepted and consumed; transcript replay owns PTY output timing. |
+| `--fallback-model`, `--max-budget-usd` | Accepted and consumed because the PTY path cannot enforce Claude print-mode fallback or budget policy. |
+
+Forwarded Claude runtime flags include `--model`, `--effort`,
+`--permission-mode`, `--add-dir`, `--allowed-tools`, `--tools`,
+`--mcp-config`, `--settings`, `--system-prompt`, `--append-system-prompt`,
+`--plugin-dir`, `--plugin-url`, browser flags, MCP debug flags, and related
+Claude global controls from `claude --help`.
+
+Recognized value flags support `--flag=value`. Variadic Claude flags consume one
+value per occurrence; repeat the flag or insert `--` before prompt text when the
+flag/prompt boundary is ambiguous.
 
 ## PTY Runtime Command Form
 

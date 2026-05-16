@@ -81,6 +81,8 @@ pub fn main_entry() {
                 timeout_ms,
                 output_format,
                 resume,
+                None,
+                false,
                 auto_accept_workspace_trust,
                 extra_args,
                 true,
@@ -98,7 +100,10 @@ fn is_top_level_help(args: &[std::ffi::OsString]) -> bool {
     matches!(first, None | Some("-h" | "--help" | "help"))
         || matches!(
             (first, second),
-            (Some("p" | "print"), None | Some("-h" | "--help" | "help"))
+            (
+                Some("p" | "print" | "-p" | "--print"),
+                None | Some("-h" | "--help" | "help")
+            )
         )
 }
 
@@ -120,8 +125,31 @@ Default print-compatible mode:
   interactive PTY path. Runtime diagnostics are suppressed from stdout.
 
 Options:
+  -p, --print                              Print-compatible mode marker
+  --input-format <text|stream-json>        Stdin input format
   --output-format <text|json|stream-json>   Output format for transcript replay
+  --json-schema <schema>                   Append JSON-only schema instruction
   --model <model>                           Forward model to Claude
+  --effort <level>                          Forward effort to Claude
+  --permission-mode <mode>                  Forward permission mode to Claude
+  --allowed-tools <tools>                   Forward allowed tools to Claude
+  --disallowed-tools <tools>                Forward disallowed tools to Claude
+  --tools <tools>                           Forward tool set to Claude
+  --add-dir <directory>                     Forward additional working directory
+  --mcp-config <config>                     Forward MCP config to Claude
+  --settings <file-or-json>                 Forward settings to Claude
+  --system-prompt <prompt>                  Forward system prompt to Claude
+  --append-system-prompt <prompt>           Forward appended system prompt
+  --plugin-dir <path>                       Forward plugin directory to Claude
+  --plugin-url <url>                        Forward plugin URL to Claude
+  --session-id <uuid>                       Use session id for PTY run
+  --no-session-persistence                  Suppress generated session id
+  --verbose                                 Accepted print compatibility flag
+  --include-partial-messages                Accepted print compatibility flag
+  --include-hook-events                     Accepted print compatibility flag
+  --replay-user-messages                    Accepted print compatibility flag
+  --fallback-model <model>                  Accepted print compatibility flag
+  --max-budget-usd <amount>                 Accepted print compatibility flag
   --claude-bin <path>                       Claude binary path
   --cwd <path>                              Working directory
   --timeout-ms <ms>                         Runtime timeout
@@ -302,7 +330,7 @@ fn run(config: &RunConfig, prompt_override: Option<String>) -> i32 {
         return 7;
     }
 
-    match transcript::wait_for_user_after_offset(
+    match transcript::wait_for_prompt_activity_after_offset(
         &transcript_path_buf,
         transcript_start_offset,
         PROMPT_ACCEPTANCE_TIMEOUT_MS,
@@ -581,7 +609,7 @@ fn build_claude_args(config: &RunConfig, hook_dir: &hook::HookDir) -> Vec<String
             args.push("--resume".to_string());
             args.push(session_id.clone());
         }
-    } else {
+    } else if !config.no_session_persistence {
         args.push("--session-id".to_string());
         args.push(config.session_id.clone());
     }

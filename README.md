@@ -4,7 +4,7 @@
 
 It has two surfaces:
 
-- `claude-exec ...` / `claude-e ...`: `claude -p`-style command surface backed by the interactive PTY runtime. Prompt arguments, piped stdin, `--model`, and `--output-format` are accepted without requiring the explicit `run` subcommand.
+- `claude-exec ...` / `claude-e ...`: `claude -p`-style command surface backed by the interactive PTY runtime. Prompt arguments, piped stdin, `p` / `print` aliases, print-only formatting flags, session controls, and common Claude runtime flags are accepted without requiring the explicit `run` subcommand.
 - `claude-exec run ...`: interactive PTY runtime for agent systems. It provides stdin prompt input, JSONL runtime events, transcript replay, timeout handling, resume support, and explicit Claude binary resolution.
 
 The code was extracted from cli-jaw's native `jaw-claude-i` helper. The primary public name is now `claude-exec`; `claude-i` and `jaw-claude-i` remain compatibility binary aliases.
@@ -36,6 +36,7 @@ claude-e p "your prompt here"
 claude-exec --output-format json "summarize this commit" < commit.diff
 claude-e --output-format stream-json "audit src/" --verbose | jq .
 claude-exec --model opus "explain quicksort to a 10-year-old"
+claude-e p --input-format stream-json --output-format json < messages.jsonl
 ```
 
 The PTY-backed print-compatible Claude binary defaults to `claude`. Override it with
@@ -81,7 +82,11 @@ Default print-compatible contract:
 - Parses `claude -p`-style arguments.
 - Builds a prompt from positional prompt text plus piped stdin.
 - Runs the existing interactive Claude PTY wrapper with runtime diagnostics suppressed from stdout.
-- Intercepts `--output-format` for wrapper output normalization and forwards Claude runtime flags such as `--model`.
+- Accepts `claude-e p ...`, `claude-e print ...`, `claude-e -p ...`, and `claude-e --print ...` as aliases for the same PTY-backed print-compatible mode.
+- Intercepts `--input-format text|stream-json`, `--output-format text|json|stream-json`, `--session-id`, `--no-session-persistence`, `--json-schema`, and wrapper-local controls for output and session normalization.
+- Accepts print-only flags such as `--verbose`, `--include-partial-messages`, `--include-hook-events`, `--replay-user-messages`, `--fallback-model`, and `--max-budget-usd` for command-shape compatibility. The PTY path consumes flags it cannot faithfully enforce.
+- Forwards common Claude runtime flags such as `--model`, `--effort`, `--permission-mode`, `--add-dir`, `--allowed-tools`, `--tools`, `--mcp-config`, `--settings`, `--system-prompt`, `--append-system-prompt`, `--plugin-dir`, and `--plugin-url`.
+- Supports `--flag=value` spelling for recognized value flags. Variadic Claude flags consume one value per occurrence; repeat the flag or use `--` before prompt text when the boundary is ambiguous.
 
 PTY `run` input:
 
@@ -103,7 +108,7 @@ Exit codes:
 - `4`: Claude spawn or PTY write failure.
 - `5`: SessionStart failure or timeout. Timeout errors include a compact PTY screen snapshot when available.
 - `6`: run timeout.
-- `7`: prompt injection verification failure.
+- `7`: prompt injection verification failure. The verification accepts a new `user` transcript record or an `assistant` transcript record after the prompt offset, because some Claude builds begin responding before the user record is flushed.
 - `11`: Claude StopFailure hook.
 - `13`: hook setup failure.
 - `16`: prompt read or validation failure.
