@@ -14,10 +14,12 @@ single-command interface, JSON output, timeouts, resume wiring, and explicit
 binary resolution.
 
 ```bash
-npx claude-e "your prompt here"
-npx claude-e p --model opus "explain quicksort to a 10-year-old"
-npx claude-e --output-format json "summarize this commit" < commit.diff
-npx claude-e --output-format stream-json "audit src/" --verbose | jq .
+npm install -g claude-e
+
+claude-e "your prompt here"
+claude-e p --model opus "explain quicksort to a 10-year-old"
+claude-e --output-format json "summarize this commit" < commit.diff
+claude-e --output-format stream-json "audit src/" --verbose | jq .
 ```
 
 ## Why This Exists
@@ -43,7 +45,14 @@ classify failures, and move on.
 npm install -g claude-e
 ```
 
-One-shot usage:
+After installation, the CLI is available directly:
+
+```bash
+claude-e "your prompt here"
+claude-e --help
+```
+
+Optional one-shot usage without a global install:
 
 ```bash
 npx claude-e "your prompt here"
