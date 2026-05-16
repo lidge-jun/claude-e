@@ -5,6 +5,8 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/runtime-Rust-orange.svg)](Cargo.toml)
 
+![claude-e demo](screenshot.png)
+
 `claude-e` is a PTY-backed execution wrapper for Claude Code.
 
 It gives Claude a `claude -p`-style command surface while still driving the
