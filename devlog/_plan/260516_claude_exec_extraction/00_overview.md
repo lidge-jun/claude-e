@@ -35,7 +35,14 @@ Reason:
 - Do not immediately remove `claude-i` from cli-jaw.
 - Do not immediately rename the runtime JSON envelope.
 - Do not require npm distribution before the local Rust runtime works.
-- Do not change Claude permission policy in the extracted repo; forwarded Claude args own that.
+- Do not change Claude tool permission policy in the extracted repo; forwarded Claude args own that.
+- Workspace trust is wrapper-owned because it appears before `SessionStart` and blocks PTY prompt injection in fresh cwd homes.
+
+## Runtime Follow-up
+
+- `--auto-accept-workspace-trust` is an active wrapper behavior, not a reserved flag.
+- The wrapper samples the PTY screen before `SessionStart` and submits the affirmative trust choice when Claude asks whether the workspace files are trusted.
+- `SessionStart` timeout errors include a compact screen snapshot so cwd-specific startup prompts are visible in JSONL diagnostics.
 
 ## Verification
 

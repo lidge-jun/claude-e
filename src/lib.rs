@@ -127,9 +127,16 @@ fn run(config: &RunConfig) -> i32 {
         let sentinel = hook_dir.sentinel_path("session-start");
         let start_wait = std::time::Instant::now();
         let timeout = std::time::Duration::from_millis(20_000);
+        let mut trust_accept_attempted = false;
         loop {
             if sentinel.exists() {
                 break;
+            }
+            if config.auto_accept_trust
+                && !trust_accept_attempted
+                && pty_child.try_auto_accept_workspace_trust()
+            {
+                trust_accept_attempted = true;
             }
             if let Ok(Some(status)) = pty_child.child.try_wait() {
                 let code = if status.success() { 0 } else { 1 };
@@ -141,7 +148,13 @@ fn run(config: &RunConfig) -> i32 {
                 return 5;
             }
             if start_wait.elapsed() > timeout {
-                protocol::emit_error(&config.run_id, "SessionStart timeout after 20s", 5);
+                let screen = compact_screen_snapshot(&pty_child.screen_snapshot());
+                let message = if screen.is_empty() {
+                    "SessionStart timeout after 20s".to_string()
+                } else {
+                    format!("SessionStart timeout after 20s; screen: {screen}")
+                };
+                protocol::emit_error(&config.run_id, &message, 5);
                 cleanup::kill_process_group(child_pid, &config.run_id);
                 return 5;
             }
@@ -378,6 +391,16 @@ fn wait_transcript_stable(sentinel_path: &std::path::Path, stable_ms: u64) {
         }
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
+}
+
+fn compact_screen_snapshot(screen: &str) -> String {
+    let compact = screen
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join(" | ");
+    compact.chars().take(800).collect()
 }
 
 const MAX_PROMPT_BYTES: usize = 10 * 1024 * 1024; // 10MB

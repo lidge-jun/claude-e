@@ -37,7 +37,7 @@ claude-exec exec [wrapper flags] -- [claude args]
 | `--cols` | `120` | PTY columns. |
 | `--rows` | `40` | PTY rows. |
 | `--resume` | unset | Resume persisted Claude session. |
-| `--auto-accept-workspace-trust` | `false` | Reserved compatibility flag; current permission bypass happens through forwarded Claude args. |
+| `--auto-accept-workspace-trust` | `false` | Watch the interactive PTY before `SessionStart` and accept Claude's workspace trust prompt when detected. |
 
 ## Forwarded Claude Args
 

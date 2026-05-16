@@ -13,6 +13,8 @@
 
 Fresh runs add a generated `--session-id`. Resume runs pass `--resume <session-id>`.
 
+When `--auto-accept-workspace-trust` is set, the wrapper watches the PTY screen while waiting for the `SessionStart` hook. If Claude displays a workspace trust prompt, the wrapper submits the affirmative menu choice before prompt injection starts.
+
 The wrapper writes a temporary Claude settings file with hook commands. Hooks relay SessionStart, Stop, and StopFailure payloads to files in an isolated temporary directory.
 
 ## Output
@@ -37,7 +39,7 @@ Claude transcript records are tailed and normalized into Claude-like stream-json
 | `1` | Underlying Claude exited unsuccessfully without a more specific wrapper classification |
 | `2` | Graceful interrupt; session metadata can be resumable |
 | `4` | Claude spawn or PTY write failure |
-| `5` | SessionStart hook failure, timeout, or early Claude exit before SessionStart |
+| `5` | SessionStart hook failure, timeout, or early Claude exit before SessionStart. Timeout errors include a compact PTY screen snapshot when available. |
 | `6` | Runtime timeout |
 | `7` | Prompt injection transcript verification failure |
 | `11` | Claude StopFailure hook |

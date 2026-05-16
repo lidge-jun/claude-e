@@ -11,7 +11,7 @@ pub struct RunConfig {
     pub timeout_ms: u64,
     pub output_format: String,
     pub resume_session: Option<String>,
-    pub _auto_accept_trust: bool,
+    pub auto_accept_trust: bool,
     pub extra_args: Vec<String>,
 }
 
@@ -44,7 +44,7 @@ impl RunConfig {
             timeout_ms,
             output_format,
             resume_session: resume,
-            _auto_accept_trust: auto_accept_trust,
+            auto_accept_trust,
             extra_args,
         }
     }

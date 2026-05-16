@@ -26,6 +26,7 @@ printf 'Say hello in one short sentence.\n' \
       --jsonl \
       --output-format stream-json \
       --timeout-ms 600000 \
+      --auto-accept-workspace-trust \
       --claude-bin "$(command -v claude)" \
       -- \
       --model claude-opus-4-6 \
@@ -61,13 +62,14 @@ Output:
 - JSONL is written to stdout.
 - Runtime lifecycle records use `{"type":"jaw_runtime", ...}` for cli-jaw compatibility.
 - Claude transcript records are normalized into Claude-like stream JSON.
+- `--auto-accept-workspace-trust` watches the interactive PTY screen before `SessionStart` and accepts Claude's workspace trust prompt when it appears.
 
 Exit codes:
 
 - `0`: normal completion.
 - `2`: graceful interrupt; session can be resumable.
 - `4`: Claude spawn or PTY write failure.
-- `5`: SessionStart failure or timeout.
+- `5`: SessionStart failure or timeout. Timeout errors include a compact PTY screen snapshot when available.
 - `6`: run timeout.
 - `7`: prompt injection verification failure.
 - `11`: Claude StopFailure hook.
