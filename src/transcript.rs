@@ -163,7 +163,7 @@ fn emit_line(normalized: &str, output_format: &str) {
         "json" => {
             if let Ok(v) = serde_json::from_str::<serde_json::Value>(normalized) {
                 let t = v.get("type").and_then(|t| t.as_str()).unwrap_or("");
-                if t == "assistant" || t == "result" {
+                if t == "result" {
                     println!("{normalized}");
                 }
             }

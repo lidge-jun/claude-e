@@ -1,6 +1,11 @@
 # claude-exec
 
-`claude-exec` is a non-interactive execution wrapper for Claude Code. It gives Claude a Codex `exec`-style surface for agent runtimes: stdin prompt input, JSONL runtime events, transcript replay, timeout handling, resume support, and explicit Claude binary resolution.
+`claude-exec` is a non-interactive execution wrapper for Claude Code.
+
+It has two surfaces:
+
+- `claude-exec ...` / `claude-e ...`: `claude -p`-style command surface backed by the interactive PTY runtime. Prompt arguments, piped stdin, `--model`, and `--output-format` are accepted without requiring the explicit `run` subcommand.
+- `claude-exec run ...`: interactive PTY runtime for agent systems. It provides stdin prompt input, JSONL runtime events, transcript replay, timeout handling, resume support, and explicit Claude binary resolution.
 
 The code was extracted from cli-jaw's native `jaw-claude-i` helper. The primary public name is now `claude-exec`; `claude-i` and `jaw-claude-i` remain compatibility binary aliases.
 
@@ -10,15 +15,33 @@ The code was extracted from cli-jaw's native `jaw-claude-i` helper. The primary 
 cargo build --release
 ```
 
-This builds three binaries from the same source:
+This builds four binaries from the same source:
 
 ```text
 target/release/claude-exec
+target/release/claude-e
 target/release/claude-i
 target/release/jaw-claude-i
 ```
 
 ## Run
+
+Default mode mirrors the `claude -p` command shape while still using the PTY wrapper:
+
+```bash
+claude-exec "your prompt here"
+claude-e "your prompt here"
+claude-e p "your prompt here"
+
+claude-exec --output-format json "summarize this commit" < commit.diff
+claude-e --output-format stream-json "audit src/" --verbose | jq .
+claude-exec --model opus "explain quicksort to a 10-year-old"
+```
+
+The PTY-backed print-compatible Claude binary defaults to `claude`. Override it with
+`CLAUDE_EXEC_CLAUDE_BIN=/path/to/claude` or `CLAUDE_BIN=/path/to/claude`.
+
+The PTY wrapper mode remains explicit:
 
 ```bash
 printf 'Say hello in one short sentence.\n' \
@@ -49,15 +72,24 @@ For development without installing, the `bin/` wrappers run `target/release/clau
 
 The scaffold also includes `package.json` with npm-style binary wrappers. That makes local linking possible now and leaves room for an npm release flow later. The Rust crate still has `publish = false` until the final registry target and release workflow are chosen.
 
+When published under the `claude-exec` package name, `npx claude-exec "prompt"` resolves naturally. `claude-e` is included as a binary alias; one-shot npm use is `npx -p claude-exec claude-e "prompt"` unless a separate `claude-e` alias package is published.
+
 ## Contract
 
-Input:
+Default print-compatible contract:
+
+- Parses `claude -p`-style arguments.
+- Builds a prompt from positional prompt text plus piped stdin.
+- Runs the existing interactive Claude PTY wrapper with runtime diagnostics suppressed from stdout.
+- Intercepts `--output-format` for wrapper output normalization and forwards Claude runtime flags such as `--model`.
+
+PTY `run` input:
 
 - Prompt is read from stdin.
 - Empty stdin is rejected.
 - Prompt input is capped at 10 MB.
 
-Output:
+PTY `run` output:
 
 - JSONL is written to stdout.
 - Runtime lifecycle records use `{"type":"jaw_runtime", ...}` for cli-jaw compatibility.

@@ -4,12 +4,49 @@
 
 `claude-exec` is the primary binary.
 
+`claude-e` is a short public alias for the same binary behavior.
+
 Two compatibility names are intentionally built from the same library entrypoint:
 
 - `claude-i`: short transitional alias used by cli-jaw's provider id today.
 - `jaw-claude-i`: legacy helper name used by existing cli-jaw detection and scripts.
 
-## Command Form
+## Default `claude -p`-Style PTY Mode
+
+Without a `run` or `exec` subcommand, `claude-exec` and `claude-e` expose a
+`claude -p`-style surface while still running the interactive PTY wrapper:
+
+```text
+claude-e [claude -p style args] <prompt>
+```
+
+The wrapper parses prompt arguments and piped stdin, suppresses internal
+`jaw_runtime` events from stdout, and maps `--output-format` to transcript
+normalization. Claude runtime flags such as `--model` are forwarded into the PTY
+Claude process.
+
+Examples:
+
+```bash
+claude-exec "your prompt here"
+claude-e "your prompt here"
+claude-e p "your prompt here"
+
+claude-exec --output-format json "summarize this commit" < commit.diff
+claude-e --output-format stream-json "audit src/" --verbose | jq .
+claude-exec --model opus "explain quicksort to a 10-year-old"
+```
+
+Claude binary resolution for print-compatible PTY mode:
+
+1. `CLAUDE_EXEC_CLAUDE_BIN`
+2. `CLAUDE_BIN`
+3. `claude`
+
+`p` and `print` are accepted as optional leading aliases for this same default
+mode, so `claude-e p "prompt"` is equivalent to `claude-e "prompt"`.
+
+## PTY Runtime Command Form
 
 Primary form:
 
@@ -25,7 +62,7 @@ claude-exec exec [wrapper flags] -- [claude args]
 
 `run` remains the stable compatibility form because cli-jaw currently emits `jaw-claude-i run ...`.
 
-## Wrapper Flags
+## PTY Wrapper Flags
 
 | Flag | Default | Meaning |
 |---|---:|---|

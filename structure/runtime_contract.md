@@ -1,13 +1,38 @@
 # Runtime Contract
 
-## Input
+## Default Print-Compatible PTY Mode
+
+When no `run` or `exec` subcommand is present, `claude-exec` and `claude-e`
+parse a `claude -p`-style invocation and execute the existing PTY runtime:
+
+```text
+claude-e [claude -p style args] <prompt>
+```
+
+This mode still allocates a PTY and injects the prompt through Claude Code's
+interactive UI. It suppresses wrapper runtime diagnostics from stdout so the
+visible surface behaves like a print-mode command.
+
+Accepted print-style controls:
+
+- optional leading `p` or `print` alias;
+- positional prompt text;
+- piped stdin, appended after the positional prompt;
+- `--output-format text|json|stream-json` for wrapper output normalization;
+- `--verbose`, accepted for compatibility and not forwarded to interactive Claude;
+- Claude runtime flags such as `--model`, forwarded to the PTY Claude process.
+
+The Claude binary is resolved from `CLAUDE_EXEC_CLAUDE_BIN`, then `CLAUDE_BIN`,
+then `claude`.
+
+## PTY Run Input
 
 - The prompt is read from stdin.
 - Empty stdin is rejected with exit code `16`.
 - Prompt input is capped at 10 MB.
 - The sanitized prompt is injected into Claude through bracketed paste in a PTY.
 
-## Spawn
+## PTY Spawn
 
 `claude-exec` starts the underlying Claude CLI in a PTY. The Claude binary defaults to `claude`, but embedding runtimes should pass an explicit path with `--claude-bin` to avoid PATH snapshot drift.
 
@@ -17,7 +42,7 @@ When `--auto-accept-workspace-trust` is set, the wrapper watches the PTY screen 
 
 The wrapper writes a temporary Claude settings file with hook commands. Hooks relay SessionStart, Stop, and StopFailure payloads to files in an isolated temporary directory.
 
-## Output
+## PTY Output
 
 Stdout is JSONL.
 
@@ -48,6 +73,7 @@ Claude transcript records are tailed and normalized into Claude-like stream-json
 
 ## Compatibility Guarantees
 
+- `claude-exec ...` and `claude-e ...` without `run`/`exec` preserve the `claude -p` command shape while staying PTY-backed.
 - `claude-exec run` remains stable for cli-jaw integration.
 - `jaw-claude-i` remains a compatibility binary while cli-jaw migration is active.
 - `claude-i` remains a compatibility binary while settings and saved cli-jaw provider ids still reference it.

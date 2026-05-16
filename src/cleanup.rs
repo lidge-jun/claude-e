@@ -13,8 +13,11 @@ pub fn graceful_exit(
     child: &mut Box<dyn portable_pty::Child + Send>,
     pid: u32,
     run_id: &str,
+    emit_events: bool,
 ) {
-    protocol::emit_cleanup(run_id, "cleanup_started", false);
+    if emit_events {
+        protocol::emit_cleanup(run_id, "cleanup_started", false);
+    }
 
     // Send /exit to let Claude save session state
     if let Ok(mut w) = writer.lock() {
@@ -27,19 +30,23 @@ pub fn graceful_exit(
     let start = Instant::now();
     while start.elapsed() < grace {
         if let Ok(Some(_)) = child.try_wait() {
-            protocol::emit_cleanup(run_id, "cleanup_done", false);
+            if emit_events {
+                protocol::emit_cleanup(run_id, "cleanup_done", false);
+            }
             return;
         }
         std::thread::sleep(Duration::from_millis(100));
     }
 
     // Child didn't exit — escalate
-    kill_process_group(pid, run_id);
+    kill_process_group(pid, run_id, emit_events);
 }
 
 /// Hard kill: SIGTERM → grace → SIGKILL. Used for timeouts and errors.
-pub fn kill_process_group(pid: u32, run_id: &str) {
-    protocol::emit_cleanup(run_id, "cleanup_started", false);
+pub fn kill_process_group(pid: u32, run_id: &str, emit_events: bool) {
+    if emit_events {
+        protocol::emit_cleanup(run_id, "cleanup_started", false);
+    }
 
     let pgid = Pid::from_raw(-(pid as i32));
 
@@ -51,7 +58,9 @@ pub fn kill_process_group(pid: u32, run_id: &str) {
     let start = Instant::now();
     while start.elapsed() < grace {
         if kill(pgid, None).is_err() {
-            protocol::emit_cleanup(run_id, "cleanup_done", false);
+            if emit_events {
+                protocol::emit_cleanup(run_id, "cleanup_done", false);
+            }
             return;
         }
         std::thread::sleep(Duration::from_millis(100));
@@ -62,5 +71,7 @@ pub fn kill_process_group(pid: u32, run_id: &str) {
     }
 
     std::thread::sleep(Duration::from_millis(200));
-    protocol::emit_cleanup(run_id, "cleanup_done", true);
+    if emit_events {
+        protocol::emit_cleanup(run_id, "cleanup_done", true);
+    }
 }

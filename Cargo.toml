@@ -13,6 +13,10 @@ name = "claude-exec"
 path = "src/bin/claude-exec.rs"
 
 [[bin]]
+name = "claude-e"
+path = "src/bin/claude-e.rs"
+
+[[bin]]
 name = "claude-i"
 path = "src/bin/claude-i.rs"
 

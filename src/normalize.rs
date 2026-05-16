@@ -107,6 +107,7 @@ fn is_local_command_user(message: &Value) -> bool {
 /// Synthesize a result event from the final assistant message.
 pub fn synthesize_result(last_assistant: &Value) -> Option<String> {
     let message = last_assistant.get("message")?;
+    let result_text = assistant_text(message);
     let usage = message
         .get("usage")
         .cloned()
@@ -120,13 +121,29 @@ pub fn synthesize_result(last_assistant: &Value) -> Option<String> {
 
     let result = serde_json::json!({
         "type": "result",
-        "result": "success",
+        "subtype": "success",
+        "is_error": false,
+        "result": result_text,
         "session_id": session_id,
         "model": model,
         "usage": usage,
     });
 
     serde_json::to_string(&result).ok()
+}
+
+fn assistant_text(message: &Value) -> String {
+    let Some(content) = message.get("content").and_then(|c| c.as_array()) else {
+        return String::new();
+    };
+
+    let mut text = String::new();
+    for block in content {
+        if block.get("type").and_then(|t| t.as_str()) == Some("text") {
+            text.push_str(block.get("text").and_then(|t| t.as_str()).unwrap_or(""));
+        }
+    }
+    text
 }
 
 #[cfg(test)]
@@ -198,6 +215,9 @@ mod tests {
         let result = synthesize_result(&assistant).expect("should synthesize");
         let parsed: Value = serde_json::from_str(&result).expect("valid json");
         assert_eq!(parsed["type"], "result");
+        assert_eq!(parsed["subtype"], "success");
+        assert_eq!(parsed["is_error"], false);
+        assert_eq!(parsed["result"], "hello");
         assert_eq!(parsed["session_id"], "abc-123");
     }
 }

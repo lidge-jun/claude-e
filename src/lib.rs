@@ -4,6 +4,7 @@ mod cleanup;
 mod config;
 mod hook;
 mod normalize;
+mod print_mode;
 mod protocol;
 mod sanitize;
 mod terminal;
@@ -24,6 +25,39 @@ const PROMPT_ACCEPTANCE_TIMEOUT_MS: u64 = 8_000;
 
 pub fn main_entry() {
     env_logger::init();
+    let raw_args = std::env::args_os().skip(1).collect::<Vec<_>>();
+    let first = raw_args.first().and_then(|arg| arg.to_str());
+
+    if is_top_level_help(&raw_args) {
+        print_top_level_help();
+        std::process::exit(0);
+    }
+    if matches!(first, Some("-V" | "--version" | "version")) {
+        println!("claude-exec {VERSION}");
+        std::process::exit(0);
+    }
+
+    if !matches!(first, Some("run" | "exec")) {
+        let stdin_prompt = match print_mode::read_stdin_if_piped() {
+            Ok(input) => input,
+            Err(e) => {
+                eprintln!("claude-exec: {e}");
+                std::process::exit(16);
+            }
+        };
+        let options = match print_mode::parse_print_mode_args(raw_args, stdin_prompt) {
+            Ok(options) => options,
+            Err(e) => {
+                eprintln!("claude-exec: {e}");
+                std::process::exit(16);
+            }
+        };
+        let prompt = options.prompt.clone();
+        let config = print_mode::config_from_options(options);
+        let exit_code = run(&config, Some(prompt));
+        std::process::exit(exit_code);
+    }
+
     let cli = Cli::parse();
 
     match cli.command {
@@ -49,22 +83,76 @@ pub fn main_entry() {
                 resume,
                 auto_accept_workspace_trust,
                 extra_args,
+                true,
             );
-            let exit_code = run(&config);
+            let exit_code = run(&config, None);
             std::process::exit(exit_code);
         }
     }
 }
 
-fn run(config: &RunConfig) -> i32 {
-    protocol::emit_runtime_started(&config.run_id, VERSION);
+fn is_top_level_help(args: &[std::ffi::OsString]) -> bool {
+    let first = args.first().and_then(|arg| arg.to_str());
+    let second = args.get(1).and_then(|arg| arg.to_str());
+
+    matches!(first, None | Some("-h" | "--help" | "help"))
+        || matches!(
+            (first, second),
+            (Some("p" | "print"), None | Some("-h" | "--help" | "help"))
+        )
+}
+
+fn print_top_level_help() {
+    println!(
+        "\
+claude-exec {VERSION}
+
+PTY-backed Claude print-compatible executor
+
+Usage:
+  claude-exec [options] <prompt>
+  claude-e [options] <prompt>
+  claude-e p [options] <prompt>
+  claude-exec run [wrapper flags] -- [claude args]
+
+Default print-compatible mode:
+  Positional prompt text and piped stdin are injected through Claude Code's
+  interactive PTY path. Runtime diagnostics are suppressed from stdout.
+
+Options:
+  --output-format <text|json|stream-json>   Output format for transcript replay
+  --model <model>                           Forward model to Claude
+  --claude-bin <path>                       Claude binary path
+  --cwd <path>                              Working directory
+  --timeout-ms <ms>                         Runtime timeout
+  --resume <session-id>                     Resume Claude session
+  --auto-accept-workspace-trust             Accept workspace trust prompt
+  --no-auto-accept-workspace-trust          Disable workspace trust auto-accept
+  -h, --help                                Show this help
+  -V, --version                             Show version
+
+Examples:
+  claude-e \"your prompt here\"
+  claude-e p --model opus \"explain quicksort\"
+  claude-e --output-format stream-json \"audit src/\" --verbose
+  claude-exec --output-format json \"summarize this commit\" < commit.diff
+"
+    );
+}
+
+fn run(config: &RunConfig, prompt_override: Option<String>) -> i32 {
+    emit_runtime_started(config);
 
     // Read prompt from stdin
-    let prompt = match read_prompt() {
-        Ok(p) => p,
-        Err(e) => {
-            protocol::emit_error(&config.run_id, &e, 16);
-            return 16;
+    let prompt = if let Some(prompt) = prompt_override {
+        prompt
+    } else {
+        match read_prompt() {
+            Ok(p) => p,
+            Err(e) => {
+                emit_error(config, &e, 16);
+                return 16;
+            }
         }
     };
 
@@ -72,7 +160,7 @@ fn run(config: &RunConfig) -> i32 {
     let prompt = match sanitize::sanitize_prompt(&prompt) {
         Ok(p) => p,
         Err(e) => {
-            protocol::emit_error(&config.run_id, &format!("prompt rejected: {e}"), 16);
+            emit_error(config, &format!("prompt rejected: {e}"), 16);
             return 16;
         }
     };
@@ -81,7 +169,7 @@ fn run(config: &RunConfig) -> i32 {
     let hook_dir = match hook::HookDir::create() {
         Ok(hd) => hd,
         Err(e) => {
-            protocol::emit_error(&config.run_id, &e, 13);
+            emit_error(config, &e, 13);
             return 13;
         }
     };
@@ -114,13 +202,13 @@ fn run(config: &RunConfig) -> i32 {
     ) {
         Ok(c) => c,
         Err(e) => {
-            protocol::emit_error(&config.run_id, &e, 4);
+            emit_error(config, &e, 4);
             return 4;
         }
     };
 
     let child_pid = pty_child.child.process_id().unwrap_or(0);
-    protocol::emit_claude_spawned(&config.run_id, child_pid);
+    emit_claude_spawned(config, child_pid);
 
     // Wait for SessionStart hook (also check for early child exit / resume failure)
     {
@@ -140,8 +228,8 @@ fn run(config: &RunConfig) -> i32 {
             }
             if let Ok(Some(status)) = pty_child.child.try_wait() {
                 let code = if status.success() { 0 } else { 1 };
-                protocol::emit_error(
-                    &config.run_id,
+                emit_error(
+                    config,
                     &format!("Claude exited before SessionStart (exit {})", code),
                     5,
                 );
@@ -154,8 +242,8 @@ fn run(config: &RunConfig) -> i32 {
                 } else {
                     format!("SessionStart timeout after 20s; screen: {screen}")
                 };
-                protocol::emit_error(&config.run_id, &message, 5);
-                cleanup::kill_process_group(child_pid, &config.run_id);
+                emit_error(config, &message, 5);
+                cleanup::kill_process_group(child_pid, &config.run_id, config.emit_runtime_events);
                 return 5;
             }
             std::thread::sleep(std::time::Duration::from_millis(50));
@@ -168,7 +256,7 @@ fn run(config: &RunConfig) -> i32 {
     let session_id =
         hook::extract_session_id(&session_payload).unwrap_or_else(|| config.session_id.clone());
 
-    protocol::emit_session_started(&config.run_id, &session_id, &transcript_path);
+    emit_session_started(config, &session_id, &transcript_path);
     let transcript_path_buf = PathBuf::from(&transcript_path);
     let transcript_start_offset = if transcript_path.is_empty() {
         0
@@ -184,8 +272,8 @@ fn run(config: &RunConfig) -> i32 {
     {
         let mut w = pty_child.writer.lock().unwrap();
         if let Err(e) = w.write_all(&paste_bytes) {
-            protocol::emit_error(&config.run_id, &format!("prompt write failed: {e}"), 4);
-            cleanup::kill_process_group(child_pid, &config.run_id);
+            emit_error(config, &format!("prompt write failed: {e}"), 4);
+            cleanup::kill_process_group(child_pid, &config.run_id, config.emit_runtime_events);
             return 4;
         }
         let _ = w.flush();
@@ -195,21 +283,21 @@ fn run(config: &RunConfig) -> i32 {
     {
         let mut w = pty_child.writer.lock().unwrap();
         if let Err(e) = w.write_all(&submit_bytes) {
-            protocol::emit_error(&config.run_id, &format!("submit write failed: {e}"), 4);
-            cleanup::kill_process_group(child_pid, &config.run_id);
+            emit_error(config, &format!("submit write failed: {e}"), 4);
+            cleanup::kill_process_group(child_pid, &config.run_id, config.emit_runtime_events);
             return 4;
         }
         let _ = w.flush();
     }
-    protocol::emit_prompt_injected(&config.run_id);
+    emit_prompt_injected(config);
 
     if transcript_path.is_empty() {
-        protocol::emit_error(
-            &config.run_id,
+        emit_error(
+            config,
             "prompt injection cannot be verified: SessionStart did not provide a transcript path",
             7,
         );
-        cleanup::kill_process_group(child_pid, &config.run_id);
+        cleanup::kill_process_group(child_pid, &config.run_id, config.emit_runtime_events);
         pty_child.join_drain();
         return 7;
     }
@@ -222,24 +310,24 @@ fn run(config: &RunConfig) -> i32 {
     ) {
         Ok(true) => {}
         Ok(false) => {
-            protocol::emit_error(
-                &config.run_id,
+            emit_error(
+                config,
                 &format!(
                     "prompt injection did not reach Claude transcript after {PROMPT_ACCEPTANCE_TIMEOUT_MS}ms"
                 ),
                 7,
             );
-            cleanup::kill_process_group(child_pid, &config.run_id);
+            cleanup::kill_process_group(child_pid, &config.run_id, config.emit_runtime_events);
             pty_child.join_drain();
             return 7;
         }
         Err(e) => {
-            protocol::emit_error(
-                &config.run_id,
+            emit_error(
+                config,
                 &format!("prompt injection transcript verification failed: {e}"),
                 7,
             );
-            cleanup::kill_process_group(child_pid, &config.run_id);
+            cleanup::kill_process_group(child_pid, &config.run_id, config.emit_runtime_events);
             pty_child.join_drain();
             return 7;
         }
@@ -295,12 +383,13 @@ fn wait_for_completion(
     loop {
         // Check signals (SIGINT/SIGTERM → graceful exit, preserving session)
         if pty_child.stop.load(Ordering::Relaxed) {
-            protocol::emit_interrupted(&config.run_id, session_id);
+            emit_interrupted(config, session_id);
             cleanup::graceful_exit(
                 &pty_child.writer,
                 &mut pty_child.child,
                 child_pid,
                 &config.run_id,
+                config.emit_runtime_events,
             );
             return 2;
         }
@@ -309,7 +398,7 @@ fn wait_for_completion(
         if hook_dir.sentinel_path("stop").exists() {
             let payload = hook_dir.read_payload("stop").unwrap_or_default();
             let tp = hook::extract_transcript_path(&payload).unwrap_or_default();
-            protocol::emit_stop_received(&config.run_id, &tp);
+            emit_stop_received(config, &tp);
 
             wait_transcript_stable(&hook_dir.sentinel_path("stop"), 1000);
 
@@ -318,6 +407,7 @@ fn wait_for_completion(
                 &mut pty_child.child,
                 child_pid,
                 &config.run_id,
+                config.emit_runtime_events,
             );
             return 0;
         }
@@ -329,12 +419,13 @@ fn wait_for_completion(
                 .get("error")
                 .and_then(|e| e.as_str())
                 .unwrap_or("unknown StopFailure");
-            protocol::emit_stop_failure(&config.run_id, error);
+            emit_stop_failure(config, error);
             cleanup::graceful_exit(
                 &pty_child.writer,
                 &mut pty_child.child,
                 child_pid,
                 &config.run_id,
+                config.emit_runtime_events,
             );
             return 11;
         }
@@ -348,7 +439,7 @@ fn wait_for_completion(
             if hook_dir.sentinel_path("stop").exists() {
                 let payload = hook_dir.read_payload("stop").unwrap_or_default();
                 let tp = hook::extract_transcript_path(&payload).unwrap_or_default();
-                protocol::emit_stop_received(&config.run_id, &tp);
+                emit_stop_received(config, &tp);
                 return 0;
             }
             if hook_dir.sentinel_path("stop-failure").exists() {
@@ -357,7 +448,7 @@ fn wait_for_completion(
                     .get("error")
                     .and_then(|e| e.as_str())
                     .unwrap_or("unknown StopFailure");
-                protocol::emit_stop_failure(&config.run_id, error);
+                emit_stop_failure(config, error);
                 return 11;
             }
 
@@ -366,12 +457,66 @@ fn wait_for_completion(
 
         // Timeout
         if start.elapsed() > timeout {
-            protocol::emit_error(&config.run_id, "timeout waiting for completion", 6);
-            cleanup::kill_process_group(child_pid, &config.run_id);
+            emit_error(config, "timeout waiting for completion", 6);
+            cleanup::kill_process_group(child_pid, &config.run_id, config.emit_runtime_events);
             return 6;
         }
 
         std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+}
+
+fn emit_runtime_started(config: &RunConfig) {
+    if config.emit_runtime_events {
+        protocol::emit_runtime_started(&config.run_id, VERSION);
+    }
+}
+
+fn emit_claude_spawned(config: &RunConfig, child_pid: u32) {
+    if config.emit_runtime_events {
+        protocol::emit_claude_spawned(&config.run_id, child_pid);
+    }
+}
+
+fn emit_session_started(config: &RunConfig, session_id: &str, transcript_path: &str) {
+    if config.emit_runtime_events {
+        protocol::emit_session_started(&config.run_id, session_id, transcript_path);
+    }
+}
+
+fn emit_prompt_injected(config: &RunConfig) {
+    if config.emit_runtime_events {
+        protocol::emit_prompt_injected(&config.run_id);
+    }
+}
+
+fn emit_stop_received(config: &RunConfig, transcript_path: &str) {
+    if config.emit_runtime_events {
+        protocol::emit_stop_received(&config.run_id, transcript_path);
+    }
+}
+
+fn emit_stop_failure(config: &RunConfig, error: &str) {
+    if config.emit_runtime_events {
+        protocol::emit_stop_failure(&config.run_id, error);
+    } else {
+        eprintln!("claude-exec: {error}");
+    }
+}
+
+fn emit_interrupted(config: &RunConfig, session_id: &str) {
+    if config.emit_runtime_events {
+        protocol::emit_interrupted(&config.run_id, session_id);
+    } else {
+        eprintln!("claude-exec: interrupted");
+    }
+}
+
+fn emit_error(config: &RunConfig, message: &str, code: i32) {
+    if config.emit_runtime_events {
+        protocol::emit_error(&config.run_id, message, code);
+    } else {
+        eprintln!("claude-exec: {message}");
     }
 }
 

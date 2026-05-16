@@ -6,13 +6,13 @@
 
 | Area | Path | Notes |
 |---|---|---|
-| CLI entrypoint | `src/lib.rs`, `src/args.rs`, `src/bin/*` | `claude-exec run` / `claude-exec exec` command parsing and single-turn execution loop |
+| CLI entrypoint | `src/lib.rs`, `src/args.rs`, `src/bin/*`, `src/print_mode.rs` | default `claude -p`-style PTY mode plus `claude-exec run` / `claude-exec exec` command parsing and single-turn execution loop |
 | PTY child | `src/child.rs`, `src/terminal.rs`, `src/cleanup.rs` | Claude process spawning, terminal query responses, signal/cleanup handling |
 | Prompt safety | `src/sanitize.rs`, `src/lib.rs` | stdin read cap, prompt sanitization, bracketed paste injection |
 | Hooks | `src/hook.rs` | temporary Claude settings and hook relay script |
 | Transcript replay | `src/transcript.rs`, `src/normalize.rs` | transcript tailing and Claude-like stream-json normalization |
 | Runtime protocol | `src/protocol.rs` | `jaw_runtime` JSONL lifecycle envelope |
-| Packaging | `Cargo.toml`, `package.json`, `bin/`, `scripts/` | Rust build, local npm-style wrappers, smoke script |
+| Packaging | `Cargo.toml`, `package.json`, `bin/`, `scripts/` | Rust build, `claude-e` alias, local npm-style wrappers, smoke script |
 
 ## Documents
 
@@ -23,7 +23,9 @@
 ## Current Status
 
 - Primary binary: `claude-exec`
+- Short public alias: `claude-e`
 - Compatibility binaries: `claude-i`, `jaw-claude-i`
+- Default command mode: `claude -p`-style PTY wrapper
 - Primary subcommand: `run`
 - Compatibility/semantic alias: `exec`
 - Protocol envelope: `jaw_runtime` for cli-jaw compatibility

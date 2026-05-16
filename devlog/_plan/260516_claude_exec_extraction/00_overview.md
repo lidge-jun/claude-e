@@ -20,8 +20,12 @@ Reason:
 - Extract the Rust PTY helper from `cli-jaw/native/jaw-claude-i`.
 - Rename the package and primary binary to `claude-exec`.
 - Keep compatibility binary aliases:
+  - `claude-e`
   - `claude-i`
   - `jaw-claude-i`
+- Add default `claude -p`-style PTY mode so `claude-exec "prompt"` and
+  `claude-e "prompt"` can be used like a print-mode Claude command without
+  leaving the interactive wrapper path.
 - Keep the stdout protocol stable for cli-jaw:
   - `jaw_runtime` lifecycle events.
   - Claude-like stream-json transcript replay.
@@ -37,6 +41,21 @@ Reason:
 - Do not require npm distribution before the local Rust runtime works.
 - Do not change Claude tool permission policy in the extracted repo; forwarded Claude args own that.
 - Workspace trust is wrapper-owned because it appears before `SessionStart` and blocks PTY prompt injection in fresh cwd homes.
+
+## Print-Compatible PTY Follow-up
+
+- Top-level `claude-exec ...` and `claude-e ...` parse `claude -p`-style args
+  and then call the same PTY-backed runtime used by `run`.
+- `claude-e p ...` and `claude-e print ...` are accepted as explicit aliases
+  for the same top-level print-compatible mode.
+- `run` and `exec` subcommands remain reserved for the PTY wrapper path.
+- The Claude binary can be overridden with `CLAUDE_EXEC_CLAUDE_BIN`, then
+  `CLAUDE_BIN`; otherwise it resolves `claude` from PATH.
+- Internal `jaw_runtime` lifecycle events are suppressed from stdout in this
+  top-level print-compatible mode.
+- npm one-shot behavior differs by package name: `npx claude-exec "prompt"`
+  works for the `claude-exec` package, while `claude-e` as a one-shot package
+  name needs a separate alias package or `npx -p claude-exec claude-e "prompt"`.
 
 ## Runtime Follow-up
 
