@@ -1,8 +1,22 @@
 #!/usr/bin/env sh
 set -eu
 
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+SELF=$0
+while [ -h "$SELF" ]; do
+  DIR=$(CDPATH= cd -P -- "$(dirname -- "$SELF")" && pwd)
+  TARGET=$(readlink "$SELF")
+  case "$TARGET" in
+    /*) SELF=$TARGET ;;
+    *) SELF=$DIR/$TARGET ;;
+  esac
+done
+
+ROOT=$(CDPATH= cd -P -- "$(dirname -- "$SELF")/.." && pwd)
 BIN="$ROOT/target/release/claude-exec"
+
+if [ "${CLAUDE_EXEC_BIN:-}" != "" ] && [ -x "$CLAUDE_EXEC_BIN" ]; then
+  exec "$CLAUDE_EXEC_BIN" "$@"
+fi
 
 if [ -x "$BIN" ]; then
   exec "$BIN" "$@"

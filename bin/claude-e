@@ -1,5 +1,15 @@
 #!/usr/bin/env sh
 set -eu
 
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+SELF=$0
+while [ -h "$SELF" ]; do
+  DIR=$(CDPATH= cd -P -- "$(dirname -- "$SELF")" && pwd)
+  TARGET=$(readlink "$SELF")
+  case "$TARGET" in
+    /*) SELF=$TARGET ;;
+    *) SELF=$DIR/$TARGET ;;
+  esac
+done
+
+ROOT=$(CDPATH= cd -P -- "$(dirname -- "$SELF")/.." && pwd)
 exec "$ROOT/bin/claude-exec" "$@"
