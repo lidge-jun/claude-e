@@ -244,9 +244,10 @@ npm run release:preview # publish preview dist-tag prerelease
 ```
 
 GitHub Actions only runs Rust verification and npm dry-runs. Actual npm
-publishing is intentionally local-only: authenticate with `npm login` in the
-browser-backed flow, then run `npm run release:npm` for the current version or a
-semver release helper when you explicitly want to publish.
+publishing is intentionally local-only: run `npm run release:npm` for the
+current version or a semver release helper when you explicitly want to publish.
+The script delegates auth to `npm publish`, so npm can use its normal browser
+login or OTP flow in your local terminal.
 
 ## Architecture Docs
 
