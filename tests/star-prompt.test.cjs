@@ -59,6 +59,7 @@ test('maybePromptGithubStar prints install-time URL for non-TTY sessions', async
   let marked = false;
 
   await maybePromptGithubStar({
+    env: {},
     stdinIsTTY: false,
     stdoutIsTTY: false,
     hasBeenPromptedFn: () => false,
@@ -78,6 +79,7 @@ test('maybePromptGithubStar asks and stars in interactive gh sessions', async ()
   let starred = false;
 
   await maybePromptGithubStar({
+    env: {},
     stdinIsTTY: true,
     stdoutIsTTY: true,
     hasBeenPromptedFn: () => false,
