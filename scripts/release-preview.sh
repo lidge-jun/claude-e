@@ -62,10 +62,15 @@ echo
 npm version "$PREVIEW_VERSION" --no-git-tag-version
 VERSION="$(node -p "require('./package.json').version")"
 node scripts/sync-cargo-version.mjs "$VERSION"
+cargo update -p claude-exec --precise "$VERSION"
+if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+  echo "Refusing preview release: tag v$VERSION already exists" >&2
+  exit 3
+fi
 npm run verify
 npm run publish:dry-run
 
-git add Cargo.toml package.json
+git add Cargo.lock Cargo.toml package.json
 [ -f package-lock.json ] && git add package-lock.json
 [ -f npm-shrinkwrap.json ] && git add npm-shrinkwrap.json
 git commit -m "[agent] chore: preview v$VERSION" --allow-empty

@@ -174,3 +174,7 @@ latest when needed, bump the requested version, run verification plus
 the tarball to npm, push branch/tag, and create a GitHub release when `gh` is
 available. `release:preview` publishes with the `preview` npm dist-tag and marks
 the GitHub release as a prerelease.
+
+GitHub Actions must not publish to npm. CI only verifies and dry-runs package
+contents; the real npm publish step is intentionally local-only after interactive
+npm authentication.

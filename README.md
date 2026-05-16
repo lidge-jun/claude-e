@@ -243,9 +243,10 @@ npm run release:major   # bump major, commit, tag, publish, create GitHub Releas
 npm run release:preview # publish preview dist-tag prerelease
 ```
 
-GitHub Actions runs Rust verification and npm publish dry-runs on push/PR. The
-manual `npm Publish` workflow can run dry or publish when npm credentials are
-configured.
+GitHub Actions only runs Rust verification and npm dry-runs. Actual npm
+publishing is intentionally local-only: authenticate with `npm login` in the
+browser-backed flow, then run `npm run release:npm` for the current version or a
+semver release helper when you explicitly want to publish.
 
 ## Architecture Docs
 

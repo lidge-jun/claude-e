@@ -9,11 +9,13 @@ if (!version || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
 
 const cargoToml = new URL("../Cargo.toml", import.meta.url);
 const current = readFileSync(cargoToml, "utf8");
-const next = current.replace(/^version = ".*"$/m, `version = "${version}"`);
+const versionLine = current.match(/^version = "([^"]+)"$/m);
 
-if (next === current) {
+if (!versionLine) {
   console.error("Cargo.toml package version line was not found.");
   process.exit(1);
 }
 
-writeFileSync(cargoToml, next);
+if (versionLine[1] !== version) {
+  writeFileSync(cargoToml, current.replace(/^version = ".*"$/m, `version = "${version}"`));
+}
