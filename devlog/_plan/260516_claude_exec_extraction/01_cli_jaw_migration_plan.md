@@ -21,7 +21,7 @@ Each arrow should be additive before it is destructive.
 ## Phase Order
 
 1. Keep cli-jaw provider id `claude-i` for now.
-2. Teach cli-jaw detection to prefer `CLAUDE_EXEC_BIN` and `claude-exec`.
+2. Teach cli-jaw detection to prefer `CLAUDE_EXEC_BIN`, embedded npm `claude-exec`, and PATH `claude-exec`.
 3. Keep `JAW_CLAUDE_I_BIN`, `jaw-claude-i`, and `claude-i` as compatibility fallbacks.
 4. Add provider id `claude-exec` only after detection and doctor are stable.
 5. Migrate saved settings from `claude-i` to `claude-exec`.

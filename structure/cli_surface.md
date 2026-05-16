@@ -134,3 +134,26 @@ The intended mental model is:
 codex exec   -> non-interactive Codex execution surface
 claude-exec  -> non-interactive Claude execution surface backed by interactive Claude Code
 ```
+
+## npm Packaging
+
+The npm package exposes these bins from the same Rust entrypoint:
+
+- `claude-exec`
+- `claude-e`
+- `claude-i`
+- `jaw-claude-i`
+
+`npm install -g claude-exec` runs `scripts/postinstall.cjs`, which builds the
+release binary with Cargo. The bin wrappers execute `target/release/claude-exec`
+when it exists and fall back to `cargo run` only for source checkouts. Set
+`CLAUDE_EXEC_SKIP_BUILD=1` only when another packaging layer provides the binary.
+
+Release helpers:
+
+```bash
+npm run verify
+npm run pack:dry
+npm run release:check
+npm run release:npm
+```

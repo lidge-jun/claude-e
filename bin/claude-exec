@@ -8,4 +8,10 @@ if [ -x "$BIN" ]; then
   exec "$BIN" "$@"
 fi
 
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "claude-exec native binary is not built and cargo is not available." >&2
+  echo "Run npm rebuild claude-exec, cargo build --release --locked, or set CLAUDE_EXEC_BIN to a built binary." >&2
+  exit 127
+fi
+
 exec cargo run --quiet --manifest-path "$ROOT/Cargo.toml" --bin claude-exec -- "$@"

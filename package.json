@@ -11,6 +11,9 @@
   "bugs": {
     "url": "https://github.com/lidge-jun/claude-exec/issues"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
     "claude-exec": "bin/claude-exec",
     "claude-e": "bin/claude-e",
@@ -18,15 +21,22 @@
     "jaw-claude-i": "bin/jaw-claude-i"
   },
   "scripts": {
+    "postinstall": "node scripts/postinstall.cjs",
     "build": "cargo build --release --locked",
     "test": "cargo test --locked",
     "fmt": "cargo fmt",
+    "fmt:check": "cargo fmt --check",
     "check": "cargo check --locked",
+    "verify": "npm run fmt:check && npm run test && npm run build",
+    "pack:dry": "npm pack --dry-run",
+    "release:check": "bash scripts/release-npm.sh --dry-run",
+    "release:npm": "bash scripts/release-npm.sh --publish",
     "smoke": "bash scripts/smoke.sh",
     "install:local": "cargo install --path . --locked"
   },
   "files": [
     "bin/",
+    "scripts/",
     "src/",
     "Cargo.toml",
     "Cargo.lock",

@@ -30,7 +30,7 @@ This is not a huge runtime surface, but the string appears in many docs and test
 In cli-jaw:
 
 - Add `CLAUDE_EXEC_BIN` as the preferred explicit env var.
-- Prefer `claude-exec` on PATH.
+- Prefer embedded npm `claude-exec`, then `claude-exec` on PATH.
 - Fall back to `JAW_CLAUDE_I_BIN`, `jaw-claude-i`, `claude-i`, and legacy `native/jaw-claude-i/target/...`.
 - Rename helper candidate function from `getClaudeIHelperCandidates` to `getClaudeExecCandidates`, leaving an exported deprecated alias for tests and older callers.
 
@@ -88,7 +88,7 @@ Only after `claude-exec` is published or installed locally:
 
 The first safe cli-jaw code diff should be narrow:
 
-1. Add `CLAUDE_EXEC_BIN` and `claude-exec` to detection before legacy helper names.
+1. Add `CLAUDE_EXEC_BIN`, embedded npm `claude-exec`, and PATH `claude-exec` to detection before legacy helper names.
 2. Pass explicit `--claude-bin <resolved claude path>` in `spawn.ts`.
 3. Keep provider id `claude-i` unchanged.
 4. Add tests proving detection priority and `--claude-bin` args.

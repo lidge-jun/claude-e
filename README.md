@@ -71,9 +71,32 @@ cargo install --path . --locked
 
 For development without installing, the `bin/` wrappers run `target/release/claude-exec` when present and otherwise fall back to `cargo run`.
 
-The scaffold also includes `package.json` with npm-style binary wrappers. That makes local linking possible now and leaves room for an npm release flow later. The Rust crate still has `publish = false` until the final registry target and release workflow are chosen.
+The package also supports npm installation from source. The npm `postinstall`
+script builds the Rust release binary with Cargo, and the installed bin wrappers
+execute that package-local binary:
 
-When published under the `claude-exec` package name, `npx claude-exec "prompt"` resolves naturally. `claude-e` is included as a binary alias; one-shot npm use is `npx -p claude-exec claude-e "prompt"` unless a separate `claude-e` alias package is published.
+```bash
+npm install -g claude-exec
+npx claude-exec "your prompt here"
+npx -p claude-exec claude-e p --model opus "explain quicksort"
+```
+
+Set `CLAUDE_EXEC_SKIP_BUILD=1` only when you intentionally provide a built
+binary through `CLAUDE_EXEC_BIN` or a separate packaging layer. Without a built
+binary, the wrapper requires Cargo at runtime and prints an explicit error if
+Cargo is missing.
+
+Packaging scripts:
+
+```bash
+npm run verify        # cargo fmt --check + cargo test + cargo build --release
+npm run pack:dry      # inspect the npm package contents
+npm run release:check # full local release dry run
+npm run release:npm   # publish to npm with --access public
+```
+
+The GitHub workflows run Rust tests/builds plus npm package dry-runs on push/PR,
+and publish to npm from GitHub Releases when `NPM_TOKEN` is configured.
 
 ## Contract
 

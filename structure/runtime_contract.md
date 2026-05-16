@@ -90,6 +90,7 @@ the user record is flushed.
 
 - `claude-exec ...` and `claude-e ...` without `run`/`exec` preserve the `claude -p` command shape while staying PTY-backed.
 - `claude-exec run` remains stable for cli-jaw integration.
+- `claude-exec` is the preferred cli-jaw helper binary.
 - `jaw-claude-i` remains a compatibility binary while cli-jaw migration is active.
 - `claude-i` remains a compatibility binary while settings and saved cli-jaw provider ids still reference it.
 - `jaw_runtime` remains emitted until cli-jaw supports an additive `claude_exec_runtime` event family.
