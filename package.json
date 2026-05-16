@@ -1,7 +1,17 @@
 {
   "name": "claude-exec",
   "version": "0.1.0",
-  "description": "Codex exec-style PTY wrapper for interactive Claude Code",
+  "description": "PTY-backed exec wrapper for Claude Code with claude -p-compatible CLI and cli-jaw runtime support",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "cli",
+    "pty",
+    "rust",
+    "ai-agents",
+    "automation",
+    "cli-jaw"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
