@@ -12,7 +12,7 @@
 | Hooks | `src/hook.rs` | temporary Claude settings and hook relay script |
 | Transcript replay | `src/transcript.rs`, `src/normalize.rs` | transcript tailing and Claude-like stream-json normalization |
 | Runtime protocol | `src/protocol.rs` | `jaw_runtime` JSONL lifecycle envelope |
-| Packaging | `Cargo.toml`, `package.json`, `bin/`, `scripts/`, `.github/workflows/` | Rust build, `claude-e` alias, npm/npx-safe wrappers, dry-run/publish/release scripts, local-only npm publish |
+| Packaging | `Cargo.toml`, `package.json`, `bin/`, `scripts/`, `.github/workflows/` | Rust build, `claude-e` alias, npm/npx-safe wrappers, postinstall GitHub star prompt, dry-run/publish/release scripts, local-only npm publish |
 
 ## Documents
 

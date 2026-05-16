@@ -164,9 +164,13 @@ The `claude-e` npm package exposes these bins from the same Rust entrypoint:
 - `jaw-claude-i`
 
 `npm install -g claude-e` runs `scripts/postinstall.cjs`, which builds the
-release binary with Cargo. The bin wrappers resolve npm/npx symlinks to the real
-package root, execute `target/release/claude-exec` when it exists, and fall back
-to `cargo run` only for source checkouts. Set
+release binary with Cargo and performs a one-time GitHub star prompt. When npm
+is non-interactive, postinstall prints the repository URL instead of blocking
+the install. Set `CLAUDE_E_SKIP_STAR_PROMPT=1` to suppress only that prompt, or
+`CLAUDE_E_SKIP_POSTINSTALL=1` / `CLAUDE_EXEC_SKIP_POSTINSTALL=1` to skip all
+postinstall work. The bin wrappers resolve npm/npx symlinks to the real package
+root, execute `target/release/claude-exec` when it exists, and fall back to
+`cargo run` only for source checkouts. Set `CLAUDE_E_SKIP_BUILD=1` or
 `CLAUDE_EXEC_SKIP_BUILD=1` only when another packaging layer provides the binary.
 
 Release helpers:

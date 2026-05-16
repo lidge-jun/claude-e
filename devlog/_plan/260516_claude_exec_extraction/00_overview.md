@@ -77,6 +77,10 @@ Reason:
   `npm publish --dry-run` validation, semver release helpers, preview release
   helpers, and GitHub workflows for Rust verification, npm package dry-runs, and
   npm publish from GitHub Releases.
+- `postinstall` asks once for a GitHub star when npm is interactive and the
+  authenticated `gh` CLI is available. Non-interactive installs print the
+  repository URL instead. `CLAUDE_E_SKIP_STAR_PROMPT=1` suppresses only that
+  request.
 
 ## Runtime Follow-up
 

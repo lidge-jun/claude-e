@@ -33,7 +33,8 @@
   "scripts": {
     "postinstall": "node scripts/postinstall.cjs",
     "build": "cargo build --release --locked",
-    "test": "cargo test --locked",
+    "test": "cargo test --locked && npm run test:postinstall",
+    "test:postinstall": "node --test tests/star-prompt.test.cjs",
     "fmt": "cargo fmt",
     "fmt:check": "cargo fmt --check",
     "check": "cargo check --locked",

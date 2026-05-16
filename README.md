@@ -73,8 +73,14 @@ npm install
 cargo build --release --locked
 ```
 
-The npm package builds the Rust release binary during `postinstall`. Set
-`CLAUDE_EXEC_SKIP_BUILD=1` only when another packaging layer provides the binary.
+The npm package builds the Rust release binary during `postinstall`. It also
+asks once for a GitHub star when npm is running interactively with an
+authenticated `gh` CLI; non-interactive installs print the repository URL
+instead. Set `CLAUDE_E_SKIP_STAR_PROMPT=1` to suppress the star request.
+Set `CLAUDE_E_SKIP_POSTINSTALL=1` to skip all postinstall work. Set
+`CLAUDE_E_SKIP_BUILD=1` or `CLAUDE_EXEC_SKIP_BUILD=1` only when another
+packaging layer provides the binary; the star request can still run in that
+mode unless it is skipped separately.
 
 ## Command Surface
 
