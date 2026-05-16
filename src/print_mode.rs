@@ -23,6 +23,8 @@ pub struct PrintModeOptions {
     pub session_id: Option<String>,
     pub no_session_persistence: bool,
     pub auto_accept_workspace_trust: bool,
+    pub terminal_tools: bool,
+    pub show_session_footer: bool,
     pub claude_args: Vec<String>,
 }
 
@@ -41,6 +43,8 @@ pub fn parse_print_mode_args(
     let mut session_id: Option<String> = None;
     let mut no_session_persistence = false;
     let mut auto_accept_workspace_trust = true;
+    let mut terminal_tools = false;
+    let mut show_session_footer = true;
     let mut claude_args = Vec::new();
     let mut prompt_parts = Vec::new();
     let mut json_schema: Option<String> = None;
@@ -127,6 +131,14 @@ pub fn parse_print_mode_args(
             }
             "--no-auto-accept-workspace-trust" => {
                 auto_accept_workspace_trust = false;
+                index += 1;
+            }
+            "-t" | "--t" | "--tool" | "--tool-events" | "--show-tools" => {
+                terminal_tools = true;
+                index += 1;
+            }
+            "--no-session-footer" => {
+                show_session_footer = false;
                 index += 1;
             }
             "--include-partial-messages" | "--include-hook-events" | "--verbose" => {
@@ -219,6 +231,8 @@ pub fn parse_print_mode_args(
         session_id,
         no_session_persistence,
         auto_accept_workspace_trust,
+        terminal_tools,
+        show_session_footer,
         claude_args,
     })
 }
@@ -249,6 +263,8 @@ pub fn config_from_options(options: PrintModeOptions) -> RunConfig {
         options.auto_accept_workspace_trust,
         options.claude_args,
         false,
+        options.terminal_tools,
+        options.show_session_footer,
     )
 }
 
@@ -585,6 +601,28 @@ mod tests {
         assert!(config.no_session_persistence);
         assert!(config.session_id.is_empty());
         assert!(config.extra_args.is_empty());
+    }
+
+    #[test]
+    fn maps_tool_progress_and_session_footer_flags() {
+        let options =
+            parse_print_mode_args(os_args(&["--tool", "--no-session-footer", "inspect"]), None)
+                .expect("parse print mode");
+        let config = config_from_options(options);
+
+        assert!(config.terminal_tools);
+        assert!(!config.show_session_footer);
+        assert_eq!(config.extra_args, Vec::<String>::new());
+    }
+
+    #[test]
+    fn maps_t_alias_to_tool_progress() {
+        let options =
+            parse_print_mode_args(os_args(&["--t", "inspect"]), None).expect("parse print mode");
+
+        assert!(options.terminal_tools);
+        assert!(options.show_session_footer);
+        assert_eq!(options.prompt, "inspect");
     }
 
     #[test]

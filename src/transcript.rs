@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{BufRead, BufReader, Seek, SeekFrom};
+use std::io::{BufRead, BufReader, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -11,6 +11,7 @@ pub fn tail_transcript(
     stop: Arc<AtomicBool>,
     output_format: &str,
     initial_offset: u64,
+    terminal_tools: bool,
 ) -> Result<Option<serde_json::Value>, String> {
     let mut file = wait_for_file(transcript_path, &stop, 20_000)?;
     let mut offset = clamped_initial_offset(&file, initial_offset);
@@ -46,7 +47,7 @@ pub fn tail_transcript(
                     offset += line_bytes;
 
                     if let Some(normalized) = normalize::normalize_transcript_line(&line) {
-                        emit_line(&normalized, output_format);
+                        emit_line(&normalized, output_format, terminal_tools);
 
                         if let Ok(v) = serde_json::from_str::<serde_json::Value>(&line) {
                             if v.get("type").and_then(|t| t.as_str()) == Some("assistant") {
@@ -71,7 +72,7 @@ pub fn tail_transcript(
                     let r = BufReader::new(f);
                     for line in r.lines().flatten() {
                         if let Some(normalized) = normalize::normalize_transcript_line(&line) {
-                            emit_line(&normalized, output_format);
+                            emit_line(&normalized, output_format, terminal_tools);
                             if let Ok(v) = serde_json::from_str::<serde_json::Value>(&line) {
                                 if v.get("type").and_then(|t| t.as_str()) == Some("assistant") {
                                     last_assistant = Some(v);
@@ -164,15 +165,23 @@ fn clamped_initial_offset(file: &File, requested_offset: u64) -> u64 {
         .unwrap_or(0)
 }
 
-fn emit_line(normalized: &str, output_format: &str) {
+fn emit_line(normalized: &str, output_format: &str, terminal_tools: bool) {
     match output_format {
-        "stream-json" => println!("{normalized}"),
+        "stream-json" => {
+            println!("{normalized}");
+            if terminal_tools {
+                emit_terminal_tool_events(normalized);
+            }
+        }
         "json" => {
             if let Ok(v) = serde_json::from_str::<serde_json::Value>(normalized) {
                 let t = v.get("type").and_then(|t| t.as_str()).unwrap_or("");
                 if t == "result" {
                     println!("{normalized}");
                 }
+            }
+            if terminal_tools {
+                emit_terminal_tool_events(normalized);
             }
         }
         "text" => {
@@ -181,15 +190,98 @@ fn emit_line(normalized: &str, output_format: &str) {
                     extract_and_print_text(&v);
                 }
             }
+            if terminal_tools {
+                emit_terminal_tool_events(normalized);
+            }
         }
         _ => println!("{normalized}"),
     }
 }
 
+fn emit_terminal_tool_events(normalized: &str) {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(normalized) else {
+        return;
+    };
+    let Some(message) = value.get("message") else {
+        return;
+    };
+    let Some(content) = message
+        .get("content")
+        .and_then(|content| content.as_array())
+    else {
+        return;
+    };
+
+    for block in content {
+        match block.get("type").and_then(|kind| kind.as_str()) {
+            Some("tool_use") => emit_tool_use(block),
+            Some("tool_result") => emit_tool_result(block),
+            _ => {}
+        }
+    }
+}
+
+fn emit_tool_use(block: &serde_json::Value) {
+    let name = block
+        .get("name")
+        .and_then(|value| value.as_str())
+        .unwrap_or("tool");
+    let summary = block
+        .get("input")
+        .map(compact_tool_input)
+        .unwrap_or_else(|| String::from("(no input)"));
+    eprintln!("[claude-e:tool] {name}: {summary}");
+}
+
+fn emit_tool_result(block: &serde_json::Value) {
+    let status = if block
+        .get("is_error")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false)
+    {
+        "error"
+    } else {
+        "ok"
+    };
+    let summary = block
+        .get("content")
+        .and_then(serde_json::Value::as_str)
+        .map(compact_text)
+        .unwrap_or_else(|| String::from("(no text result)"));
+    eprintln!("[claude-e:tool-result] {status}: {summary}");
+}
+
+fn compact_tool_input(input: &serde_json::Value) -> String {
+    if let Some(command) = input.get("command").and_then(serde_json::Value::as_str) {
+        return compact_text(command);
+    }
+    if let Some(description) = input.get("description").and_then(serde_json::Value::as_str) {
+        return compact_text(description);
+    }
+    if let Some(path) = input
+        .get("file_path")
+        .or_else(|| input.get("path"))
+        .and_then(serde_json::Value::as_str)
+    {
+        return compact_text(path);
+    }
+    compact_text(&input.to_string())
+}
+
+fn compact_text(text: &str) -> String {
+    const LIMIT: usize = 180;
+    let compact = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if compact.chars().count() <= LIMIT {
+        return compact;
+    }
+    let mut shortened = compact.chars().take(LIMIT).collect::<String>();
+    shortened.push_str("...");
+    shortened
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write as _;
     use std::sync::Arc;
     use std::sync::atomic::AtomicBool;
 
@@ -308,6 +400,7 @@ mod tests {
             Arc::new(AtomicBool::new(true)),
             "json",
             initial_offset,
+            false,
         )
         .expect("tail transcript")
         .expect("new assistant");
@@ -333,10 +426,15 @@ mod tests {
         )
         .expect("write real assistant");
 
-        let last_assistant =
-            tail_transcript(file.path(), Arc::new(AtomicBool::new(true)), "json", 0)
-                .expect("tail transcript")
-                .expect("real assistant");
+        let last_assistant = tail_transcript(
+            file.path(),
+            Arc::new(AtomicBool::new(true)),
+            "json",
+            0,
+            false,
+        )
+        .expect("tail transcript")
+        .expect("real assistant");
 
         assert_eq!(
             last_assistant["message"]["content"][0]["text"],
@@ -367,15 +465,20 @@ fn wait_for_file(path: &Path, stop: &AtomicBool, timeout_ms: u64) -> Result<File
 }
 
 fn extract_and_print_text(value: &serde_json::Value) {
+    let mut printed = false;
     if let Some(message) = value.get("message") {
         if let Some(content) = message.get("content").and_then(|c| c.as_array()) {
             for block in content {
                 if block.get("type").and_then(|t| t.as_str()) == Some("text") {
                     if let Some(text) = block.get("text").and_then(|t| t.as_str()) {
                         print!("{text}");
+                        printed = true;
                     }
                 }
             }
         }
+    }
+    if printed {
+        let _ = std::io::stdout().flush();
     }
 }

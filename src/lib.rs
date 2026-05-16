@@ -71,6 +71,7 @@ pub fn main_entry() {
             rows,
             resume,
             auto_accept_workspace_trust,
+            terminal_tools,
             extra_args,
         } => {
             let config = RunConfig::new(
@@ -86,6 +87,8 @@ pub fn main_entry() {
                 auto_accept_workspace_trust,
                 extra_args,
                 true,
+                terminal_tools,
+                false,
             );
             let exit_code = run(&config, None);
             std::process::exit(exit_code);
@@ -156,12 +159,16 @@ Options:
   --resume <session-id>                     Resume Claude session
   --auto-accept-workspace-trust             Accept workspace trust prompt
   --no-auto-accept-workspace-trust          Disable workspace trust auto-accept
+  -t, --tool, --t                           Show compact tool progress on stderr
+  --no-session-footer                       Hide final resume footer in print mode
   -h, --help                                Show this help
   -V, --version                             Show version
 
 Examples:
   claude-e \"your prompt here\"
   claude-e p --model opus \"explain quicksort\"
+  claude-e --tool \"use 10 tools and summarize the results\"
+  claude-e --resume 00000000-0000-4000-8000-000000000001 \"continue\"
   claude-e --output-format stream-json \"audit src/\" --verbose
   claude-e --output-format json \"summarize this commit\" < commit.diff
 "
@@ -364,12 +371,14 @@ fn run(config: &RunConfig, prompt_override: Option<String>) -> i32 {
     // Start transcript tailing in a thread
     let transcript_stop = Arc::clone(&stop);
     let output_format = config.output_format.clone();
+    let terminal_tools = config.terminal_tools;
     let transcript_handle = std::thread::spawn(move || {
         transcript::tail_transcript(
             &transcript_path_buf,
             transcript_stop,
             &output_format,
             transcript_start_offset,
+            terminal_tools,
         )
     });
 
@@ -387,6 +396,7 @@ fn run(config: &RunConfig, prompt_override: Option<String>) -> i32 {
             }
         }
     }
+    emit_session_footer(config, &session_id);
 
     // Cleanup
     pty_child.join_drain();
@@ -548,6 +558,15 @@ fn emit_error(config: &RunConfig, message: &str, code: i32) {
     }
 }
 
+fn emit_session_footer(config: &RunConfig, session_id: &str) {
+    if !config.show_session_footer || session_id.is_empty() {
+        return;
+    }
+    eprintln!();
+    eprintln!("[claude-e] session: {session_id}");
+    eprintln!("[claude-e] resume: claude-e --resume {session_id} \"your next prompt\"");
+}
+
 fn wait_transcript_stable(sentinel_path: &std::path::Path, stable_ms: u64) {
     // Wait until sentinel file mtime is stable for stable_ms
     let start = std::time::Instant::now();
@@ -617,8 +636,72 @@ fn build_claude_args(config: &RunConfig, hook_dir: &hook::HookDir) -> Vec<String
     args.push("--settings".to_string());
     args.push(hook_dir.build_settings_json());
 
-    // Forward extra args
-    args.extend(config.extra_args.iter().cloned());
+    args.extend(claude_args_with_permission_defaults(&config.extra_args));
 
     args
+}
+
+fn claude_args_with_permission_defaults(extra_args: &[String]) -> Vec<String> {
+    let mut args = extra_args.to_vec();
+    if !has_explicit_permission_policy(extra_args) {
+        args.push("--dangerously-skip-permissions".to_string());
+    }
+    args
+}
+
+fn has_explicit_permission_policy(args: &[String]) -> bool {
+    args.iter().any(|arg| {
+        matches!(
+            arg.as_str(),
+            "--dangerously-skip-permissions"
+                | "--allow-dangerously-skip-permissions"
+                | "--permission-mode"
+        ) || arg.starts_with("--permission-mode=")
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn strings(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| (*value).to_string()).collect()
+    }
+
+    #[test]
+    fn adds_permission_bypass_by_default() {
+        assert_eq!(
+            claude_args_with_permission_defaults(&strings(&["--model", "opus"])),
+            strings(&["--model", "opus", "--dangerously-skip-permissions"])
+        );
+    }
+
+    #[test]
+    fn preserves_explicit_permission_mode() {
+        assert_eq!(
+            claude_args_with_permission_defaults(&strings(&[
+                "--model",
+                "opus",
+                "--permission-mode",
+                "auto"
+            ])),
+            strings(&["--model", "opus", "--permission-mode", "auto"])
+        );
+    }
+
+    #[test]
+    fn preserves_inline_explicit_permission_mode() {
+        assert_eq!(
+            claude_args_with_permission_defaults(&strings(&["--permission-mode=auto"])),
+            strings(&["--permission-mode=auto"])
+        );
+    }
+
+    #[test]
+    fn does_not_duplicate_permission_bypass() {
+        assert_eq!(
+            claude_args_with_permission_defaults(&strings(&["--dangerously-skip-permissions"])),
+            strings(&["--dangerously-skip-permissions"])
+        );
+    }
 }

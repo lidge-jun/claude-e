@@ -15,6 +15,8 @@ pub struct RunConfig {
     pub auto_accept_trust: bool,
     pub extra_args: Vec<String>,
     pub emit_runtime_events: bool,
+    pub terminal_tools: bool,
+    pub show_session_footer: bool,
 }
 
 impl RunConfig {
@@ -31,6 +33,8 @@ impl RunConfig {
         auto_accept_trust: bool,
         extra_args: Vec<String>,
         emit_runtime_events: bool,
+        terminal_tools: bool,
+        show_session_footer: bool,
     ) -> Self {
         let session_id = if resume.is_some() || no_session_persistence {
             String::new()
@@ -53,6 +57,8 @@ impl RunConfig {
             auto_accept_trust,
             extra_args,
             emit_runtime_events,
+            terminal_tools,
+            show_session_footer,
         }
     }
 

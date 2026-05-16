@@ -50,8 +50,17 @@ pub enum Command {
         resume: Option<String>,
 
         /// Auto-accept workspace trust prompt
-        #[arg(long, default_value_t = false)]
+        #[arg(long, default_value_t = true)]
         auto_accept_workspace_trust: bool,
+
+        /// Show compact tool-use progress lines on stderr
+        #[arg(
+            short = 't',
+            long = "tool",
+            visible_alias = "t",
+            default_value_t = false
+        )]
+        terminal_tools: bool,
 
         /// Extra args to forward to claude
         #[arg(last = true)]
