@@ -25,7 +25,8 @@ claude-exec [claude -p style args] <prompt>
 The wrapper parses prompt arguments and piped stdin, suppresses internal
 `jaw_runtime` events from stdout, and maps `--output-format` to transcript
 normalization. Claude runtime flags such as `--model` are forwarded into the PTY
-Claude process.
+Claude process. Permission bypass and workspace/folder trust acceptance are
+enabled by default for unattended execution.
 
 Examples:
 
@@ -37,6 +38,8 @@ claude-exec "your prompt here"
 claude-e --output-format json "summarize this commit" < commit.diff
 claude-e --output-format stream-json "audit src/" --verbose | jq .
 claude-e --model opus "explain quicksort to a 10-year-old"
+claude-e --tool "use 10 tools and summarize the results"
+claude-e --resume 6a304357-e92d-47e7-a56d-c54065e12be1 "continue"
 claude-e p --input-format stream-json --output-format json < messages.jsonl
 ```
 
@@ -63,7 +66,9 @@ Wrapper-owned flags:
 | `--no-session-persistence` | Suppresses generated session id; consumed by the wrapper and not forwarded to interactive Claude. |
 | `--resume` / `-r` | Resumes the provided session id in the PTY path. |
 | `--json-schema` | Appends a JSON-only schema instruction to the prompt. |
-| `--auto-accept-workspace-trust`, `--no-auto-accept-workspace-trust` | Controls pre-SessionStart trust prompt handling. |
+| `--auto-accept-workspace-trust`, `--no-auto-accept-workspace-trust` | Controls pre-SessionStart workspace/folder trust prompt handling. Default is enabled. |
+| `--tool`, `--t`, `-t` | Prints compact tool-use and tool-result progress to stderr. |
+| `--no-session-footer` | Hides the final stderr resume footer in print-compatible mode. |
 
 Accepted print-only compatibility flags:
 
@@ -81,6 +86,16 @@ Claude global controls from `claude --help`.
 Recognized value flags support `--flag=value`. Variadic Claude flags consume one
 value per occurrence; repeat the flag or insert `--` before prompt text when the
 flag/prompt boundary is ambiguous.
+
+If the caller does not supply `--permission-mode`,
+`--permission-mode=...`, `--dangerously-skip-permissions`, or
+`--allow-dangerously-skip-permissions`, the wrapper appends
+`--dangerously-skip-permissions` before spawning Claude. This is the default
+automation policy for both print-compatible and runtime modes.
+
+Default text-mode runs print the Claude session id and a ready-to-copy
+`claude-e --resume <session-id> ...` command to stderr. The footer is not part
+of stdout, so programmatic output stays parseable.
 
 ## PTY Runtime Command Form
 
@@ -112,7 +127,8 @@ claude-e exec [wrapper flags] -- [claude args]
 | `--cols` | `120` | PTY columns. |
 | `--rows` | `40` | PTY rows. |
 | `--resume` | unset | Resume persisted Claude session. |
-| `--auto-accept-workspace-trust` | `false` | Watch the interactive PTY before `SessionStart` and accept Claude's workspace trust prompt when detected. |
+| `--auto-accept-workspace-trust` | `true` | Watch the interactive PTY before `SessionStart` and accept Claude's workspace/folder trust prompt when detected. |
+| `--tool`, `--t`, `-t` | `false` | Show compact terminal tool progress on stderr. |
 
 ## Forwarded Claude Args
 
@@ -125,8 +141,7 @@ printf 'Summarize this repo in two bullets.\n' \
   | claude-exec run \
       --claude-bin /Users/jun/.local/bin/claude \
       -- \
-      --model claude-opus-4-6 \
-      --dangerously-skip-permissions
+      --model claude-opus-4-6
 ```
 
 ## Naming Position
@@ -149,8 +164,9 @@ The `claude-e` npm package exposes these bins from the same Rust entrypoint:
 - `jaw-claude-i`
 
 `npm install -g claude-e` runs `scripts/postinstall.cjs`, which builds the
-release binary with Cargo. The bin wrappers execute `target/release/claude-exec`
-when it exists and fall back to `cargo run` only for source checkouts. Set
+release binary with Cargo. The bin wrappers resolve npm/npx symlinks to the real
+package root, execute `target/release/claude-exec` when it exists, and fall back
+to `cargo run` only for source checkouts. Set
 `CLAUDE_EXEC_SKIP_BUILD=1` only when another packaging layer provides the binary.
 
 Release helpers:

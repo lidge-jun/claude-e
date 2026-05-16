@@ -40,8 +40,10 @@ Reason:
 - Do not immediately remove `claude-i` from cli-jaw.
 - Do not immediately rename the runtime JSON envelope.
 - Do not require npm distribution before the local Rust runtime works.
-- Do not change Claude tool permission policy in the extracted repo; forwarded Claude args own that.
-- Workspace trust is wrapper-owned because it appears before `SessionStart` and blocks PTY prompt injection in fresh cwd homes.
+- Default to unattended Claude automation: add permission bypass unless the
+  caller supplied an explicit permission policy.
+- Workspace/folder trust is wrapper-owned because it appears before
+  `SessionStart` and blocks PTY prompt injection in fresh cwd homes.
 
 ## Print-Compatible PTY Follow-up
 
@@ -64,8 +66,13 @@ Reason:
   `CLAUDE_BIN`; otherwise it resolves `claude` from PATH.
 - Internal `jaw_runtime` lifecycle events are suppressed from stdout in this
   top-level print-compatible mode.
-- npm one-shot behavior now uses the short public package name:
-  `npx claude-e "prompt"`.
+- npm usage is documented global-install first:
+  `npm install -g claude-e`, then `claude-e "prompt"`. One-shot `npx claude-e`
+  remains supported.
+- `--tool`, `--t`, and `-t` expose terminal-friendly tool progress on stderr
+  while keeping stdout parseable.
+- Print-compatible runs emit a stderr resume footer by default, including the
+  current session id and a `claude-e --resume <session-id> ...` command.
 - npm packaging now has a Cargo-backed `postinstall`, local release scripts,
   `npm publish --dry-run` validation, semver release helpers, preview release
   helpers, and GitHub workflows for Rust verification, npm package dry-runs, and
@@ -73,8 +80,12 @@ Reason:
 
 ## Runtime Follow-up
 
-- `--auto-accept-workspace-trust` is an active wrapper behavior, not a reserved flag.
-- The wrapper samples the PTY screen before `SessionStart` and submits the affirmative trust choice when Claude asks whether the workspace files are trusted.
+- `--auto-accept-workspace-trust` is an active wrapper behavior, not a reserved flag, and is enabled by default.
+- The wrapper samples the PTY screen before `SessionStart` and submits the affirmative trust choice when Claude asks whether the workspace or folder files are trusted.
+- The wrapper appends `--dangerously-skip-permissions` to Claude args unless
+  the caller already supplied `--permission-mode`,
+  `--permission-mode=...`, `--dangerously-skip-permissions`, or
+  `--allow-dangerously-skip-permissions`.
 - `SessionStart` timeout errors include a compact screen snapshot so cwd-specific startup prompts are visible in JSONL diagnostics.
 - Prompt-injection verification accepts either a new `user` transcript record or
   a new `assistant` record after the prompt offset. This prevents false failures

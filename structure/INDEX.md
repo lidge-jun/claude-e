@@ -12,7 +12,7 @@
 | Hooks | `src/hook.rs` | temporary Claude settings and hook relay script |
 | Transcript replay | `src/transcript.rs`, `src/normalize.rs` | transcript tailing and Claude-like stream-json normalization |
 | Runtime protocol | `src/protocol.rs` | `jaw_runtime` JSONL lifecycle envelope |
-| Packaging | `Cargo.toml`, `package.json`, `bin/`, `scripts/`, `.github/workflows/` | Rust build, `claude-e` alias, local npm-style wrappers, dry-run/publish/release scripts, npm publish workflow |
+| Packaging | `Cargo.toml`, `package.json`, `bin/`, `scripts/`, `.github/workflows/` | Rust build, `claude-e` alias, npm/npx-safe wrappers, dry-run/publish/release scripts, local-only npm publish |
 
 ## Documents
 
@@ -26,6 +26,9 @@
 - Long compatibility alias: `claude-exec`
 - Compatibility binaries: `claude-i`, `jaw-claude-i`
 - Default command mode: `claude -p`-style PTY wrapper
+- Default automation policy: permission bypass plus workspace/folder trust acceptance
+- Terminal progress: `--tool`, `--t`, and `-t` emit compact tool events on stderr
+- Resume footer: print-compatible runs show `claude-e --resume <session-id>` on stderr
 - Primary subcommand: `run`
 - Compatibility/semantic alias: `exec`
 - Protocol envelope: `jaw_runtime` for cli-jaw compatibility

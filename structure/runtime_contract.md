@@ -24,8 +24,17 @@ Accepted print-style controls:
 - `--output-format text|json|stream-json` for wrapper output normalization;
 - `--session-id`, `--no-session-persistence`, `--resume`, and `-r` for session shape;
 - `--json-schema`, which becomes an explicit JSON-only instruction appended to the prompt;
+- `--tool`, `--t`, and `-t` for compact terminal tool progress on stderr;
+- `--no-session-footer` to hide the default stderr resume footer;
 - `--verbose`, `--include-partial-messages`, `--include-hook-events`, `--replay-user-messages`, `--fallback-model`, and `--max-budget-usd`, accepted for compatibility and consumed when the PTY path cannot enforce the exact print-mode behavior;
 - Claude runtime flags such as `--model`, `--effort`, `--permission-mode`, `--add-dir`, `--allowed-tools`, `--tools`, `--mcp-config`, `--settings`, and prompt/system/plugin flags, forwarded to the PTY Claude process.
+
+Unless a caller supplies an explicit permission policy
+(`--permission-mode`, `--permission-mode=...`,
+`--dangerously-skip-permissions`, or
+`--allow-dangerously-skip-permissions`), the wrapper appends
+`--dangerously-skip-permissions` to the Claude invocation. This prevents
+non-interactive tool use from hanging at permission prompts.
 
 Recognized value flags support `--flag=value`. Variadic Claude flags consume one
 value per occurrence; repeat the flag or insert `--` before prompt text when the
@@ -49,7 +58,10 @@ Fresh runs add a generated `--session-id` unless print-compatible mode received
 `--no-session-persistence`. Resume runs pass `--resume <session-id>`. A
 print-compatible `--session-id` value overrides the generated id.
 
-When `--auto-accept-workspace-trust` is set, the wrapper watches the PTY screen while waiting for the `SessionStart` hook. If Claude displays a workspace trust prompt, the wrapper submits the affirmative menu choice before prompt injection starts.
+Workspace/folder trust handling is enabled by default. The wrapper watches the
+PTY screen while waiting for the `SessionStart` hook. If Claude displays a
+workspace or folder trust prompt, the wrapper submits the affirmative menu choice
+before prompt injection starts.
 
 The wrapper writes a temporary Claude settings file with hook commands. Hooks relay SessionStart, Stop, and StopFailure payloads to files in an isolated temporary directory.
 
@@ -66,6 +78,17 @@ Stdout is JSONL.
 The envelope remains `jaw_runtime` during the extraction because cli-jaw already consumes it. A future protocol rename can add `claude_exec_runtime` as an additive alias before removing `jaw_runtime`.
 
 Claude transcript records are tailed and normalized into Claude-like stream-json records. On completion, a synthetic result record may be emitted from the last assistant message.
+
+When terminal tool progress is enabled, compact `tool_use` and `tool_result`
+lines are emitted to stderr. Stdout remains the selected output format.
+
+In print-compatible mode, a final session footer is emitted to stderr by
+default:
+
+```text
+[claude-e] session: <session-id>
+[claude-e] resume: claude-e --resume <session-id> "your next prompt"
+```
 
 After prompt injection, the wrapper verifies that the transcript advanced beyond
 the pre-injection offset. A new `user` record or a new `assistant` record counts

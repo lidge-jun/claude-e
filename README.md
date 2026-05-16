@@ -18,6 +18,7 @@ npm install -g claude-e
 
 claude-e "your prompt here"
 claude-e p --model opus "explain quicksort to a 10-year-old"
+claude-e --tool "use 10 tools and summarize the results"
 claude-e --output-format json "summarize this commit" < commit.diff
 claude-e --output-format stream-json "audit src/" --verbose | jq .
 ```
@@ -37,6 +38,8 @@ classify failures, and move on.
 | Agent-friendly output | Normalizes transcript replay into `text`, `json`, or `stream-json`. |
 | Embedding stability | Supports `run` / `exec`, JSONL runtime events, timeout exit codes, and resume. |
 | Launchd/server safety | Lets callers pass an explicit `--claude-bin` instead of relying on PATH. |
+| Unattended tools | Enables Claude permission bypass and workspace/folder trust handling by default. |
+| Terminal progress | `--tool`, `--t`, or `-t` prints compact tool-use lines on stderr. |
 | cli-jaw migration | Keeps `claude-exec`, `claude-i`, and `jaw-claude-i` compatibility bins. |
 
 ## Install
@@ -49,6 +52,7 @@ After installation, the CLI is available directly:
 
 ```bash
 claude-e "your prompt here"
+claude-e --tool "use 10 tools"
 claude-e --help
 ```
 
@@ -106,6 +110,17 @@ Plain text:
 claude-e "write a two-line commit summary"
 ```
 
+Terminal tool progress:
+
+```bash
+claude-e --tool "use 10 tools and summarize what happened"
+claude-e --t --model opus "inspect this repo with tools"
+```
+
+`--tool` / `--t` / `-t` prints compact `tool_use` and `tool_result` progress
+lines to stderr. Stdout stays reserved for the final answer or selected output
+format, so pipes and JSON consumers are not broken.
+
 JSON result:
 
 ```bash
@@ -117,6 +132,10 @@ Stream JSON:
 ```bash
 claude-e --output-format stream-json "audit src/" --verbose | jq .
 ```
+
+For streaming UIs, prefer `--output-format stream-json`. It preserves the
+Claude-like assistant/user records, including tool calls, tool results, and the
+final synthesized result event.
 
 Explicit Claude binary:
 
@@ -134,6 +153,22 @@ claude-e \
   "continue this investigation from the existing Claude session"
 ```
 
+Every print-compatible run tracks the Claude session id. In text mode,
+`claude-e` prints a resume footer to stderr:
+
+```text
+[claude-e] session: 6a304357-e92d-47e7-a56d-c54065e12be1
+[claude-e] resume: claude-e --resume 6a304357-e92d-47e7-a56d-c54065e12be1 "your next prompt"
+```
+
+Resume with:
+
+```bash
+claude-e --resume 6a304357-e92d-47e7-a56d-c54065e12be1 "continue from there"
+```
+
+Use `--no-session-footer` when the terminal footer is not wanted.
+
 ## PTY Runtime Mode
 
 Agent systems can use the explicit runtime command:
@@ -144,11 +179,9 @@ printf 'Say hello in one short sentence.\n' \
       --jsonl \
       --output-format stream-json \
       --timeout-ms 600000 \
-      --auto-accept-workspace-trust \
       --claude-bin "$(command -v claude)" \
       -- \
-      --model claude-opus-4-6 \
-      --dangerously-skip-permissions
+      --model claude-opus-4-6
 ```
 
 `exec` is a visible alias for `run`:
@@ -174,7 +207,10 @@ Wrapper-owned flags:
 | `--resume`, `-r` | Resumes a Claude session in the PTY path. |
 | `--no-session-persistence` | Suppresses generated session ids. |
 | `--json-schema` | Appends a JSON-only schema instruction to the prompt. |
-| `--auto-accept-workspace-trust` | Accepts Claude's pre-SessionStart trust prompt when it appears. |
+| `--auto-accept-workspace-trust` | Accepts Claude's pre-SessionStart workspace/folder trust prompt. Enabled by default. |
+| `--no-auto-accept-workspace-trust` | Disables automatic workspace/folder trust handling in print-compatible mode. |
+| `--tool`, `--t`, `-t` | Prints compact terminal tool progress to stderr. |
+| `--no-session-footer` | Hides the final stderr resume footer in print-compatible mode. |
 
 Forwarded Claude flags include `--model`, `--effort`, `--permission-mode`,
 `--add-dir`, `--allowed-tools`, `--disallowed-tools`, `--tools`, `--mcp-config`,
@@ -186,6 +222,12 @@ Print-only compatibility flags such as `--verbose`,
 `--include-partial-messages`, `--include-hook-events`,
 `--replay-user-messages`, `--fallback-model`, and `--max-budget-usd` are
 accepted so command shapes port cleanly from print-mode Claude.
+
+Unless the caller already supplied `--permission-mode`,
+`--permission-mode=...`, `--dangerously-skip-permissions`, or
+`--allow-dangerously-skip-permissions`, `claude-e` appends
+`--dangerously-skip-permissions` to the underlying Claude invocation. This keeps
+non-interactive tool use from hanging on permission prompts.
 
 ## Output Contract
 
