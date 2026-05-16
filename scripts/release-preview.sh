@@ -18,6 +18,8 @@ if ! git diff --quiet; then
   exit 1
 fi
 
+bash scripts/ensure-npm-auth.sh "$PKG_NAME"
+
 NPM_LATEST="$(npm view "$PKG_NAME" dist-tags.latest 2>/dev/null || true)"
 PKG_VERSION="$(node -p "require('./package.json').version")"
 RAW_VERSION="${NPM_LATEST:-$PKG_VERSION}"

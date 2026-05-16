@@ -13,6 +13,10 @@ esac
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 cd "$ROOT"
 
+if [ "$MODE" = "--publish" ]; then
+  bash scripts/ensure-npm-auth.sh claude-e
+fi
+
 VERSION="$(node -p "require('./package.json').version")"
 node scripts/sync-cargo-version.mjs "$VERSION"
 cargo update -p claude-exec --precise "$VERSION"
