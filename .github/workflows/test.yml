@@ -40,5 +40,5 @@ jobs:
       - name: Verify
         run: npm run verify
 
-      - name: npm pack dry run
-        run: npm run pack:dry
+      - name: npm publish dry run
+        run: npm run publish:dry-run

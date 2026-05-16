@@ -17,9 +17,10 @@ cargo fmt --check
 cargo test --locked
 cargo build --release --locked
 npm pack --dry-run
+npm run publish:dry-run
 
 if [ "$MODE" = "--publish" ]; then
-  npm publish --access public
+  npm publish --access public --ignore-scripts
 else
-  echo "[claude-exec:release] dry-run complete; use npm run release:npm to publish."
+  echo "[claude-exec:release] dry-run complete; use npm run release:patch for a new npm release, or release:npm to publish the current package version."
 fi

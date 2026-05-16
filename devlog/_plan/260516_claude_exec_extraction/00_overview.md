@@ -66,9 +66,10 @@ Reason:
 - npm one-shot behavior differs by package name: `npx claude-exec "prompt"`
   works for the `claude-exec` package, while `claude-e` as a one-shot package
   name needs a separate alias package or `npx -p claude-exec claude-e "prompt"`.
-- npm packaging now has a Cargo-backed `postinstall`, local release scripts, and
-  GitHub workflows for Rust verification, npm package dry-runs, and npm publish
-  from GitHub Releases.
+- npm packaging now has a Cargo-backed `postinstall`, local release scripts,
+  `npm publish --dry-run` validation, semver release helpers, preview release
+  helpers, and GitHub workflows for Rust verification, npm package dry-runs, and
+  npm publish from GitHub Releases.
 
 ## Runtime Follow-up
 

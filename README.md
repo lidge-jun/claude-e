@@ -91,12 +91,19 @@ Packaging scripts:
 ```bash
 npm run verify        # cargo fmt --check + cargo test + cargo build --release
 npm run pack:dry      # inspect the npm package contents
+npm run publish:dry-run # validate the actual npm publish surface without publishing
 npm run release:check # full local release dry run
-npm run release:npm   # publish to npm with --access public
+npm run release:npm   # publish the current package version to npm with --access public
+npm run release:patch # bump patch, commit, tag, publish to npm, create GitHub Release
+npm run release:minor # bump minor, commit, tag, publish to npm, create GitHub Release
+npm run release:major # bump major, commit, tag, publish to npm, create GitHub Release
+npm run release:preview # publish a preview dist-tag prerelease
 ```
 
 The GitHub workflows run Rust tests/builds plus npm package dry-runs on push/PR,
-and publish to npm from GitHub Releases when `NPM_TOKEN` is configured.
+and publish to npm from GitHub Releases when `NPM_TOKEN` is configured. The
+manual `npm Publish` workflow can also run as a dry run, or publish when
+`dry_run` is set to `false`.
 
 ## Contract
 

@@ -40,11 +40,11 @@ jobs:
       - name: Verify package
         run: npm run verify
 
-      - name: npm pack dry run
-        run: npm run pack:dry
+      - name: npm publish dry run
+        run: npm run publish:dry-run
 
       - name: Publish to npm
         if: ${{ github.event_name == 'release' || inputs.dry_run == false }}
-        run: npm publish --access public --provenance
+        run: npm publish --access public --provenance --ignore-scripts
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

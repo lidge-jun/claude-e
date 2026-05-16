@@ -154,6 +154,19 @@ Release helpers:
 ```bash
 npm run verify
 npm run pack:dry
+npm run publish:dry-run
 npm run release:check
 npm run release:npm
+npm run release:patch
+npm run release:minor
+npm run release:major
+npm run release:preview
 ```
+
+`release:npm` publishes the current package version. The semver release helpers
+mirror the `ima2-gen` shape: they refuse dirty tracked worktrees, sync from npm
+latest when needed, bump the requested version, run verification plus
+`npm publish --dry-run`, commit `package.json`, create a `vX.Y.Z` tag, publish
+the tarball to npm, push branch/tag, and create a GitHub release when `gh` is
+available. `release:preview` publishes with the `preview` npm dist-tag and marks
+the GitHub release as a prerelease.
