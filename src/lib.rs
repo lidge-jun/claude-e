@@ -774,16 +774,20 @@ mod tests {
 
     #[test]
     fn activity_tracker_resets_on_store() {
-        let tracker = Arc::new(AtomicU64::new(epoch_ms()));
-        std::thread::sleep(std::time::Duration::from_millis(50));
-        let before_update = epoch_ms();
-        let elapsed_before = before_update.saturating_sub(tracker.load(Ordering::Relaxed));
-        assert!(elapsed_before >= 50);
+        let idle_timeout_ms: u64 = 600_000;
+        let stale_activity = epoch_ms().saturating_sub(idle_timeout_ms + 100_000);
+        let tracker = Arc::new(AtomicU64::new(stale_activity));
 
-        tracker.store(epoch_ms(), Ordering::Relaxed);
-        std::thread::sleep(std::time::Duration::from_millis(10));
-        let elapsed_after = epoch_ms().saturating_sub(tracker.load(Ordering::Relaxed));
-        assert!(elapsed_after < 50);
+        let elapsed_before = epoch_ms().saturating_sub(tracker.load(Ordering::Relaxed));
+        assert!(elapsed_before > idle_timeout_ms);
+
+        let refreshed_activity = epoch_ms();
+        tracker.store(refreshed_activity, Ordering::Relaxed);
+
+        let stored_activity = tracker.load(Ordering::Relaxed);
+        assert!(stored_activity >= refreshed_activity);
+        let elapsed_after = epoch_ms().saturating_sub(stored_activity);
+        assert!(elapsed_after < idle_timeout_ms);
     }
 
     #[test]

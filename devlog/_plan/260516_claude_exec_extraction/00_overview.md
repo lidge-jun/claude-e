@@ -102,6 +102,10 @@ Reason:
 - Claude `rate_limit_event` transcript records are passed through unchanged so
   cli-jaw can treat 429 pacing as wait/retry state rather than fallback-worthy
   failure.
+- CI hardening: `activity_tracker_resets_on_store` now asserts against the
+  actual 10-minute idle-timeout window instead of a strict 50ms wall-clock
+  sleep assumption, which avoids false macOS runner failures while still
+  proving that transcript activity refreshes the idle timer.
 
 ## Verification
 
