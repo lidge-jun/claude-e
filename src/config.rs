@@ -8,7 +8,8 @@ pub struct RunConfig {
     pub cwd: PathBuf,
     pub cols: u16,
     pub rows: u16,
-    pub timeout_ms: u64,
+    pub idle_timeout_ms: u64,
+    pub hard_timeout_ms: u64,
     pub output_format: String,
     pub resume_session: Option<String>,
     pub no_session_persistence: bool,
@@ -20,12 +21,13 @@ pub struct RunConfig {
 }
 
 impl RunConfig {
-    pub fn new(
+    pub fn new_with_timeouts(
         claude_bin: String,
         cwd: Option<PathBuf>,
         cols: u16,
         rows: u16,
-        timeout_ms: u64,
+        idle_timeout_ms: u64,
+        hard_timeout_ms: u64,
         output_format: String,
         resume: Option<String>,
         session_id_override: Option<String>,
@@ -50,7 +52,8 @@ impl RunConfig {
                 .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))),
             cols,
             rows,
-            timeout_ms,
+            idle_timeout_ms,
+            hard_timeout_ms,
             output_format,
             resume_session: resume,
             no_session_persistence,

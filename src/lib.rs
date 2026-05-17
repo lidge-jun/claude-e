@@ -15,7 +15,7 @@ use std::io::Read;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use args::{Cli, Command};
 use config::RunConfig;
@@ -64,6 +64,8 @@ pub fn main_entry() {
         Command::Run {
             jsonl: _,
             output_format,
+            idle_timeout_ms,
+            hard_timeout_ms,
             timeout_ms,
             claude_bin,
             cwd,
@@ -74,12 +76,14 @@ pub fn main_entry() {
             terminal_tools,
             extra_args,
         } => {
-            let config = RunConfig::new(
+            let effective_idle = if timeout_ms > 0 { timeout_ms } else { idle_timeout_ms };
+            let config = RunConfig::new_with_timeouts(
                 claude_bin,
                 cwd,
                 cols,
                 rows,
-                timeout_ms,
+                effective_idle,
+                hard_timeout_ms,
                 output_format,
                 resume,
                 None,
@@ -376,8 +380,12 @@ fn run(config: &RunConfig, prompt_override: Option<String>) -> i32 {
         }
     }
 
+    // Shared activity tracker for idle timeout
+    let last_activity = Arc::new(AtomicU64::new(epoch_ms()));
+
     // Start transcript tailing in a thread
     let transcript_stop = Arc::clone(&stop);
+    let transcript_activity = Arc::clone(&last_activity);
     let output_format = config.output_format.clone();
     let terminal_tools = config.terminal_tools;
     let transcript_handle = std::thread::spawn(move || {
@@ -387,11 +395,12 @@ fn run(config: &RunConfig, prompt_override: Option<String>) -> i32 {
             &output_format,
             transcript_start_offset,
             terminal_tools,
+            Some(transcript_activity),
         )
     });
 
     // Wait for Stop/StopFailure or child exit
-    let exit_code = wait_for_completion(config, &hook_dir, &mut pty_child, child_pid, &session_id);
+    let exit_code = wait_for_completion(config, &hook_dir, &mut pty_child, child_pid, &session_id, &last_activity);
 
     // Signal transcript thread to finalize
     stop.store(true, Ordering::Relaxed);
@@ -422,8 +431,10 @@ fn wait_for_completion(
     pty_child: &mut child::PtyChild,
     child_pid: u32,
     session_id: &str,
+    last_activity: &Arc<AtomicU64>,
 ) -> i32 {
-    let timeout = std::time::Duration::from_millis(config.timeout_ms);
+    let idle_timeout_ms = config.idle_timeout_ms;
+    let hard_timeout_ms = config.hard_timeout_ms;
     let start = std::time::Instant::now();
 
     loop {
@@ -501,9 +512,18 @@ fn wait_for_completion(
             return if status.success() { 0 } else { 1 };
         }
 
-        // Timeout
-        if start.elapsed() > timeout {
-            emit_error(config, "timeout waiting for completion", 6);
+        // Idle timeout: no transcript activity for idle_timeout_ms
+        let last_ts = last_activity.load(Ordering::Relaxed);
+        let idle_elapsed = epoch_ms().saturating_sub(last_ts);
+        if idle_elapsed > idle_timeout_ms {
+            emit_error(config, &format!("idle timeout: no transcript activity for {idle_timeout_ms}ms"), 6);
+            cleanup::kill_process_group(child_pid, &config.run_id, config.emit_runtime_events);
+            return 6;
+        }
+
+        // Hard timeout: absolute max runtime
+        if start.elapsed() > std::time::Duration::from_millis(hard_timeout_ms) {
+            emit_error(config, &format!("hard timeout: total runtime exceeded {hard_timeout_ms}ms"), 6);
             cleanup::kill_process_group(child_pid, &config.run_id, config.emit_runtime_events);
             return 6;
         }
@@ -601,6 +621,14 @@ fn compact_screen_snapshot(screen: &str) -> String {
         .collect::<Vec<_>>()
         .join(" | ");
     compact.chars().take(800).collect()
+}
+
+#[allow(clippy::cast_possible_truncation)]
+fn epoch_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
 }
 
 const MAX_PROMPT_BYTES: usize = 10 * 1024 * 1024; // 10MB
@@ -711,5 +739,52 @@ mod tests {
             claude_args_with_permission_defaults(&strings(&["--dangerously-skip-permissions"])),
             strings(&["--dangerously-skip-permissions"])
         );
+    }
+
+    #[test]
+    fn epoch_ms_returns_reasonable_value() {
+        let now = epoch_ms();
+        // Should be after 2024-01-01 (ms)
+        assert!(now > 1_704_067_200_000);
+    }
+
+    #[test]
+    fn activity_tracker_resets_on_store() {
+        let tracker = Arc::new(AtomicU64::new(epoch_ms()));
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        let before_update = epoch_ms();
+        let elapsed_before = before_update.saturating_sub(tracker.load(Ordering::Relaxed));
+        assert!(elapsed_before >= 50);
+
+        tracker.store(epoch_ms(), Ordering::Relaxed);
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        let elapsed_after = epoch_ms().saturating_sub(tracker.load(Ordering::Relaxed));
+        assert!(elapsed_after < 50);
+    }
+
+    #[test]
+    fn idle_timeout_fires_when_no_activity() {
+        let last_activity = Arc::new(AtomicU64::new(epoch_ms() - 700_000));
+        let idle_timeout_ms: u64 = 600_000;
+        let last_ts = last_activity.load(Ordering::Relaxed);
+        let idle_elapsed = epoch_ms().saturating_sub(last_ts);
+        assert!(idle_elapsed > idle_timeout_ms);
+    }
+
+    #[test]
+    fn idle_timeout_does_not_fire_with_recent_activity() {
+        let last_activity = Arc::new(AtomicU64::new(epoch_ms()));
+        let idle_timeout_ms: u64 = 600_000;
+        let last_ts = last_activity.load(Ordering::Relaxed);
+        let idle_elapsed = epoch_ms().saturating_sub(last_ts);
+        assert!(idle_elapsed < idle_timeout_ms);
+    }
+
+    #[test]
+    fn hard_timeout_fires_regardless_of_activity() {
+        let start = std::time::Instant::now();
+        let hard_timeout = std::time::Duration::from_millis(100);
+        std::thread::sleep(std::time::Duration::from_millis(150));
+        assert!(start.elapsed() > hard_timeout);
     }
 }

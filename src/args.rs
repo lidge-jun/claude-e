@@ -25,8 +25,16 @@ pub enum Command {
         #[arg(long, default_value = "stream-json")]
         output_format: String,
 
-        /// Timeout in milliseconds (default: 600000 = 10 min)
+        /// Idle timeout in milliseconds — resets on transcript activity (default: 600000 = 10 min)
         #[arg(long, default_value_t = 600_000)]
+        idle_timeout_ms: u64,
+
+        /// Hard timeout in milliseconds — absolute max runtime (default: 3600000 = 1 hour)
+        #[arg(long, default_value_t = 3_600_000)]
+        hard_timeout_ms: u64,
+
+        /// Alias for --idle-timeout-ms (backward compat)
+        #[arg(long, default_value_t = 0)]
         timeout_ms: u64,
 
         /// Path to claude binary (default: "claude")

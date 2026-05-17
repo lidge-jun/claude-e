@@ -2,9 +2,20 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use crate::normalize;
+
+fn touch_activity(tracker: Option<&Arc<AtomicU64>>) {
+    if let Some(t) = tracker {
+        #[allow(clippy::cast_possible_truncation)]
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+        t.store(now, Ordering::Relaxed);
+    }
+}
 
 pub fn tail_transcript(
     transcript_path: &Path,
@@ -12,6 +23,7 @@ pub fn tail_transcript(
     output_format: &str,
     initial_offset: u64,
     terminal_tools: bool,
+    activity_tracker: Option<Arc<AtomicU64>>,
 ) -> Result<Option<serde_json::Value>, String> {
     let mut file = wait_for_file(transcript_path, &stop, 20_000)?;
     let mut offset = clamped_initial_offset(&file, initial_offset);
@@ -45,6 +57,7 @@ pub fn tail_transcript(
 
                     any_line = true;
                     offset += line_bytes;
+                    touch_activity(activity_tracker.as_ref());
 
                     if let Some(normalized) = normalize::normalize_transcript_line(&line) {
                         emit_line(&normalized, output_format, terminal_tools);
@@ -72,6 +85,7 @@ pub fn tail_transcript(
                     let r = BufReader::new(f);
                     for line in r.lines().map_while(Result::ok) {
                         if let Some(normalized) = normalize::normalize_transcript_line(&line) {
+                            touch_activity(activity_tracker.as_ref());
                             emit_line(&normalized, output_format, terminal_tools);
                             if let Ok(v) = serde_json::from_str::<serde_json::Value>(&line) {
                                 if v.get("type").and_then(|t| t.as_str()) == Some("assistant") {
@@ -401,6 +415,7 @@ mod tests {
             "json",
             initial_offset,
             false,
+            None,
         )
         .expect("tail transcript")
         .expect("new assistant");
@@ -432,6 +447,7 @@ mod tests {
             "json",
             0,
             false,
+            None,
         )
         .expect("tail transcript")
         .expect("real assistant");
