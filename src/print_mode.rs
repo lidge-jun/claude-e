@@ -93,9 +93,10 @@ pub fn parse_print_mode_args(
             }
             "--idle-timeout-ms" => {
                 let raw = take_value(&args, &mut index, "--idle-timeout-ms", inline_value)?;
-                idle_timeout_ms = Some(raw
-                    .parse::<u64>()
-                    .map_err(|_| format!("invalid --idle-timeout-ms value: {raw}"))?);
+                idle_timeout_ms = Some(
+                    raw.parse::<u64>()
+                        .map_err(|_| format!("invalid --idle-timeout-ms value: {raw}"))?,
+                );
             }
             "--hard-timeout-ms" => {
                 let raw = take_value(&args, &mut index, "--hard-timeout-ms", inline_value)?;

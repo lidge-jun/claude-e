@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
 use crate::normalize;
 
@@ -17,6 +17,30 @@ fn touch_activity(tracker: Option<&Arc<AtomicU64>>) {
     }
 }
 
+fn update_tool_state(event: &serde_json::Value, counter: Option<&Arc<AtomicUsize>>) {
+    let Some(counter) = counter else { return };
+    let content = event
+        .get("message")
+        .or(Some(event))
+        .and_then(|m| m.get("content"))
+        .and_then(|c| c.as_array());
+    let Some(blocks) = content else { return };
+
+    for block in blocks {
+        match block.get("type").and_then(|t| t.as_str()) {
+            Some("tool_use") => {
+                counter.fetch_add(1, Ordering::Relaxed);
+            }
+            Some("tool_result") => {
+                let _ = counter.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |v| {
+                    if v > 0 { Some(v - 1) } else { None }
+                });
+            }
+            _ => {}
+        }
+    }
+}
+
 pub fn tail_transcript(
     transcript_path: &Path,
     stop: Arc<AtomicBool>,
@@ -24,6 +48,7 @@ pub fn tail_transcript(
     initial_offset: u64,
     terminal_tools: bool,
     activity_tracker: Option<Arc<AtomicU64>>,
+    active_tools: Option<Arc<AtomicUsize>>,
 ) -> Result<Option<serde_json::Value>, String> {
     let mut file = wait_for_file(transcript_path, &stop, 20_000)?;
     let mut offset = clamped_initial_offset(&file, initial_offset);
@@ -58,6 +83,9 @@ pub fn tail_transcript(
                     any_line = true;
                     offset += line_bytes;
                     touch_activity(activity_tracker.as_ref());
+                    if let Ok(v) = serde_json::from_str::<serde_json::Value>(&line) {
+                        update_tool_state(&v, active_tools.as_ref());
+                    }
 
                     if let Some(normalized) = normalize::normalize_transcript_line(&line) {
                         emit_line(&normalized, output_format, terminal_tools);
@@ -416,6 +444,7 @@ mod tests {
             initial_offset,
             false,
             None,
+            None,
         )
         .expect("tail transcript")
         .expect("new assistant");
@@ -448,6 +477,7 @@ mod tests {
             0,
             false,
             None,
+            None,
         )
         .expect("tail transcript")
         .expect("real assistant");
@@ -456,6 +486,58 @@ mod tests {
             last_assistant["message"]["content"][0]["text"],
             "REAL_RESPONSE"
         );
+    }
+
+    #[test]
+    fn update_tool_state_increments_on_tool_use() {
+        let counter = Arc::new(AtomicUsize::new(0));
+        let event: serde_json::Value = serde_json::json!({
+            "type": "assistant",
+            "message": {
+                "content": [
+                    {"type": "tool_use", "name": "bash", "input": {}},
+                    {"type": "tool_use", "name": "read", "input": {}}
+                ]
+            }
+        });
+        update_tool_state(&event, Some(&counter));
+        assert_eq!(counter.load(Ordering::Relaxed), 2);
+    }
+
+    #[test]
+    fn update_tool_state_decrements_on_tool_result() {
+        let counter = Arc::new(AtomicUsize::new(2));
+        let event: serde_json::Value = serde_json::json!({
+            "type": "user",
+            "message": {
+                "role": "user",
+                "content": [{"type": "tool_result", "tool_use_id": "abc", "content": "ok"}]
+            }
+        });
+        update_tool_state(&event, Some(&counter));
+        assert_eq!(counter.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn update_tool_state_saturates_at_zero() {
+        let counter = Arc::new(AtomicUsize::new(0));
+        let event: serde_json::Value = serde_json::json!({
+            "type": "user",
+            "message": {
+                "content": [{"type": "tool_result", "content": "ok"}]
+            }
+        });
+        update_tool_state(&event, Some(&counter));
+        assert_eq!(counter.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn update_tool_state_noop_without_flag() {
+        let event: serde_json::Value = serde_json::json!({
+            "type": "assistant",
+            "message": { "content": [{"type": "tool_use", "name": "x", "input": {}}] }
+        });
+        update_tool_state(&event, None);
     }
 }
 

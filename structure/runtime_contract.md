@@ -95,6 +95,22 @@ the pre-injection offset. A new `user` record or a new `assistant` record counts
 as acceptance, because some Claude builds can start streaming the answer before
 the user record is flushed.
 
+## PTY Timeout Semantics
+
+`--idle-timeout-ms` is a no-activity timeout. Transcript activity refreshes the
+idle deadline, including assistant/user records, tool use, and tool result
+records. While one or more tool calls are active, the idle timeout is suppressed
+until matching tool results drain the active tool counter. This prevents a long
+tool call from being killed only because no transcript line arrived for the
+idle window.
+
+`--hard-timeout-ms` remains an absolute process runtime cap. It prevents
+orphaned wrapper processes even when transcript or tool activity keeps moving.
+
+`--timeout-ms` is retained as a backward-compatible alias for
+`--idle-timeout-ms`; callers that need a process-wide cap should use
+`--hard-timeout-ms`.
+
 ## Exit Codes
 
 | Code | Meaning |

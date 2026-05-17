@@ -61,7 +61,7 @@ Wrapper-owned flags:
 |---|---|
 | `--input-format text|stream-json` | Reads plain stdin or extracts user text from JSONL messages. |
 | `--output-format text|json|stream-json` | Normalizes transcript output to the requested print-style shape. |
-| `--timeout-ms`, `--claude-bin`, `--cwd`, `--cols`, `--rows` | PTY wrapper controls. |
+| `--idle-timeout-ms`, `--hard-timeout-ms`, `--timeout-ms`, `--claude-bin`, `--cwd`, `--cols`, `--rows` | PTY wrapper controls. `--timeout-ms` remains an idle-timeout compatibility alias. |
 | `--session-id` | Uses the provided session id for the generated PTY session. |
 | `--no-session-persistence` | Suppresses generated session id; consumed by the wrapper and not forwarded to interactive Claude. |
 | `--resume` / `-r` | Resumes the provided session id in the PTY path. |
@@ -121,7 +121,9 @@ claude-e exec [wrapper flags] -- [claude args]
 |---|---:|---|
 | `--jsonl` | `true` | Emit JSONL to stdout. Kept for compatibility. |
 | `--output-format` | `stream-json` | Output normalization mode. |
-| `--timeout-ms` | `600000` | Max runtime before timeout exit. |
+| `--idle-timeout-ms` | `600000` | No-activity timeout. Transcript activity refreshes it; active tools suppress idle timeout until a tool result is observed. |
+| `--hard-timeout-ms` | `3600000` | Absolute runtime cap before timeout exit. |
+| `--timeout-ms` | `0` | Backward-compatible alias for `--idle-timeout-ms` when set. |
 | `--claude-bin` | `claude` | Claude CLI binary or absolute path. cli-jaw should pass an explicit resolved path. |
 | `--cwd` | current dir | Working directory for Claude. |
 | `--cols` | `120` | PTY columns. |

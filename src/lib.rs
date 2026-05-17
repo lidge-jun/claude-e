@@ -15,7 +15,7 @@ use std::io::Read;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
 use args::{Cli, Command};
 use config::RunConfig;
@@ -76,7 +76,11 @@ pub fn main_entry() {
             terminal_tools,
             extra_args,
         } => {
-            let effective_idle = if timeout_ms > 0 { timeout_ms } else { idle_timeout_ms };
+            let effective_idle = if timeout_ms > 0 {
+                timeout_ms
+            } else {
+                idle_timeout_ms
+            };
             let config = RunConfig::new_with_timeouts(
                 claude_bin,
                 cwd,
@@ -382,10 +386,12 @@ fn run(config: &RunConfig, prompt_override: Option<String>) -> i32 {
 
     // Shared activity tracker for idle timeout
     let last_activity = Arc::new(AtomicU64::new(epoch_ms()));
+    let active_tools = Arc::new(AtomicUsize::new(0));
 
     // Start transcript tailing in a thread
     let transcript_stop = Arc::clone(&stop);
     let transcript_activity = Arc::clone(&last_activity);
+    let transcript_active_tools = Arc::clone(&active_tools);
     let output_format = config.output_format.clone();
     let terminal_tools = config.terminal_tools;
     let transcript_handle = std::thread::spawn(move || {
@@ -396,11 +402,20 @@ fn run(config: &RunConfig, prompt_override: Option<String>) -> i32 {
             transcript_start_offset,
             terminal_tools,
             Some(transcript_activity),
+            Some(transcript_active_tools),
         )
     });
 
     // Wait for Stop/StopFailure or child exit
-    let exit_code = wait_for_completion(config, &hook_dir, &mut pty_child, child_pid, &session_id, &last_activity);
+    let exit_code = wait_for_completion(
+        config,
+        &hook_dir,
+        &mut pty_child,
+        child_pid,
+        &session_id,
+        &last_activity,
+        &active_tools,
+    );
 
     // Signal transcript thread to finalize
     stop.store(true, Ordering::Relaxed);
@@ -432,6 +447,7 @@ fn wait_for_completion(
     child_pid: u32,
     session_id: &str,
     last_activity: &Arc<AtomicU64>,
+    active_tools: &Arc<AtomicUsize>,
 ) -> i32 {
     let idle_timeout_ms = config.idle_timeout_ms;
     let hard_timeout_ms = config.hard_timeout_ms;
@@ -512,18 +528,26 @@ fn wait_for_completion(
             return if status.success() { 0 } else { 1 };
         }
 
-        // Idle timeout: no transcript activity for idle_timeout_ms
+        // Idle timeout: no transcript activity for idle_timeout_ms (skipped while tool is active)
         let last_ts = last_activity.load(Ordering::Relaxed);
         let idle_elapsed = epoch_ms().saturating_sub(last_ts);
-        if idle_elapsed > idle_timeout_ms {
-            emit_error(config, &format!("idle timeout: no transcript activity for {idle_timeout_ms}ms"), 6);
+        if idle_elapsed > idle_timeout_ms && active_tools.load(Ordering::Relaxed) == 0 {
+            emit_error(
+                config,
+                &format!("idle timeout: no transcript activity for {idle_timeout_ms}ms"),
+                6,
+            );
             cleanup::kill_process_group(child_pid, &config.run_id, config.emit_runtime_events);
             return 6;
         }
 
         // Hard timeout: absolute max runtime
         if start.elapsed() > std::time::Duration::from_millis(hard_timeout_ms) {
-            emit_error(config, &format!("hard timeout: total runtime exceeded {hard_timeout_ms}ms"), 6);
+            emit_error(
+                config,
+                &format!("hard timeout: total runtime exceeded {hard_timeout_ms}ms"),
+                6,
+            );
             cleanup::kill_process_group(child_pid, &config.run_id, config.emit_runtime_events);
             return 6;
         }
@@ -786,5 +810,45 @@ mod tests {
         let hard_timeout = std::time::Duration::from_millis(100);
         std::thread::sleep(std::time::Duration::from_millis(150));
         assert!(start.elapsed() > hard_timeout);
+    }
+
+    #[test]
+    fn idle_timeout_skipped_when_tool_active() {
+        let last_activity = Arc::new(AtomicU64::new(epoch_ms() - 700_000));
+        let active_tools = Arc::new(AtomicUsize::new(1));
+        let idle_timeout_ms: u64 = 600_000;
+
+        let last_ts = last_activity.load(Ordering::Relaxed);
+        let idle_elapsed = epoch_ms().saturating_sub(last_ts);
+        assert!(idle_elapsed > idle_timeout_ms);
+        let should_kill =
+            idle_elapsed > idle_timeout_ms && active_tools.load(Ordering::Relaxed) == 0;
+        assert!(!should_kill);
+    }
+
+    #[test]
+    fn idle_timeout_fires_when_no_tool_active() {
+        let last_activity = Arc::new(AtomicU64::new(epoch_ms() - 700_000));
+        let active_tools = Arc::new(AtomicUsize::new(0));
+        let idle_timeout_ms: u64 = 600_000;
+
+        let last_ts = last_activity.load(Ordering::Relaxed);
+        let idle_elapsed = epoch_ms().saturating_sub(last_ts);
+        let should_kill =
+            idle_elapsed > idle_timeout_ms && active_tools.load(Ordering::Relaxed) == 0;
+        assert!(should_kill);
+    }
+
+    #[test]
+    fn idle_timeout_skipped_with_multiple_tools() {
+        let last_activity = Arc::new(AtomicU64::new(epoch_ms() - 700_000));
+        let active_tools = Arc::new(AtomicUsize::new(3));
+        let idle_timeout_ms: u64 = 600_000;
+
+        let last_ts = last_activity.load(Ordering::Relaxed);
+        let idle_elapsed = epoch_ms().saturating_sub(last_ts);
+        let should_kill =
+            idle_elapsed > idle_timeout_ms && active_tools.load(Ordering::Relaxed) == 0;
+        assert!(!should_kill);
     }
 }

@@ -186,7 +186,8 @@ printf 'Say hello in one short sentence.\n' \
   | claude-e run \
       --jsonl \
       --output-format stream-json \
-      --timeout-ms 600000 \
+      --idle-timeout-ms 600000 \
+      --hard-timeout-ms 3600000 \
       --claude-bin "$(command -v claude)" \
       -- \
       --model claude-opus-4-6
@@ -207,7 +208,9 @@ Wrapper-owned flags:
 |---|---|
 | `--input-format text\|stream-json` | Reads plain stdin or extracts user text from JSONL messages. |
 | `--output-format text\|json\|stream-json` | Selects transcript output normalization. |
-| `--timeout-ms` | Runtime timeout in milliseconds. |
+| `--idle-timeout-ms` | No-activity timeout in milliseconds. Transcript activity refreshes it; active tools suppress idle timeout until a tool result is observed. |
+| `--hard-timeout-ms` | Absolute runtime cap in milliseconds. |
+| `--timeout-ms` | Backward-compatible alias for `--idle-timeout-ms`. |
 | `--claude-bin` | Claude CLI binary or absolute path. |
 | `--cwd` | Working directory for the Claude PTY process. |
 | `--cols`, `--rows` | PTY dimensions. |

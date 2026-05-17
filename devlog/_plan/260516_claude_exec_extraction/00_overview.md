@@ -94,6 +94,11 @@ Reason:
 - Prompt-injection verification accepts either a new `user` transcript record or
   a new `assistant` record after the prompt offset. This prevents false failures
   when Claude starts answering before the user record is flushed.
+- Runtime timeout is split into activity-aware idle timeout and hard cap:
+  `--idle-timeout-ms` resets on transcript activity, active tool calls suppress
+  idle timeout until tool results arrive, `--hard-timeout-ms` remains the
+  absolute process cap, and legacy `--timeout-ms` is retained as an idle-timeout
+  alias.
 
 ## Verification
 
