@@ -99,6 +99,9 @@ Reason:
   idle timeout until tool results arrive, `--hard-timeout-ms` remains the
   absolute process cap, and legacy `--timeout-ms` is retained as an idle-timeout
   alias.
+- Claude `rate_limit_event` transcript records are passed through unchanged so
+  cli-jaw can treat 429 pacing as wait/retry state rather than fallback-worthy
+  failure.
 
 ## Verification
 

@@ -77,7 +77,10 @@ Stdout is JSONL.
 
 The envelope remains `jaw_runtime` during the extraction because cli-jaw already consumes it. A future protocol rename can add `claude_exec_runtime` as an additive alias before removing `jaw_runtime`.
 
-Claude transcript records are tailed and normalized into Claude-like stream-json records. On completion, a synthetic result record may be emitted from the last assistant message.
+Claude transcript records are tailed and normalized into Claude-like stream-json
+records. `rate_limit_event` records are passed through so cli-jaw can render and
+wait through Claude 429 pacing without fallback. On completion, a synthetic
+result record may be emitted from the last assistant message.
 
 When terminal tool progress is enabled, compact `tool_use` and `tool_result`
 lines are emitted to stderr. Stdout remains the selected output format.

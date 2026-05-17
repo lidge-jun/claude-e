@@ -143,7 +143,9 @@ claude-e --output-format stream-json "audit src/" --verbose | jq .
 
 For streaming UIs, prefer `--output-format stream-json`. It preserves the
 Claude-like assistant/user records, including tool calls, tool results, and the
-final synthesized result event.
+final synthesized result event. Claude `rate_limit_event` records are passed
+through so callers can wait instead of treating transient 429 pacing as a
+fallback-worthy failure.
 
 Explicit Claude binary:
 
