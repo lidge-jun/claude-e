@@ -1,0 +1,11 @@
+{
+  "name": "@bitkyc08/claude-e-linux-arm64",
+  "version": "0.1.8",
+  "description": "Prebuilt claude-e binaries for Linux ARM64",
+  "license": "MIT",
+  "os": ["linux"],
+  "cpu": ["arm64"],
+  "libc": ["glibc"],
+  "files": ["bin/"],
+  "publishConfig": { "access": "public" }
+}

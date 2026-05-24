@@ -53,6 +53,12 @@
     "smoke": "bash scripts/smoke.sh",
     "install:local": "cargo install --path . --locked"
   },
+  "optionalDependencies": {
+    "@bitkyc08/claude-e-darwin-arm64": "0.1.8",
+    "@bitkyc08/claude-e-darwin-x64": "0.1.8",
+    "@bitkyc08/claude-e-linux-x64": "0.1.8",
+    "@bitkyc08/claude-e-linux-arm64": "0.1.8"
+  },
   "files": [
     "bin/",
     "scripts/",

@@ -1,0 +1,136 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g. 0.1.8)'
+        required: true
+      dry-run:
+        description: 'Dry run (skip npm publish)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-platform:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - target: darwin-arm64
+            runner: macos-15
+            rust-target: aarch64-apple-darwin
+            cross: false
+          - target: darwin-x64
+            runner: macos-15
+            rust-target: x86_64-apple-darwin
+            cross: true
+          - target: linux-x64
+            runner: ubuntu-24.04
+            rust-target: x86_64-unknown-linux-gnu
+            cross: false
+          - target: linux-arm64
+            runner: ubuntu-24.04-arm
+            rust-target: aarch64-unknown-linux-gnu
+            cross: false
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.rust-target }}
+
+      - name: Prepare platform package
+        run: |
+          PKG_DIR="dist-${{ matrix.target }}"
+          mkdir -p "$PKG_DIR/bin"
+          cp platform-packages/${{ matrix.target }}/package.json "$PKG_DIR/"
+          for bin in claude-exec claude-e claude-i jaw-claude-i; do
+            SRC="target/${{ matrix.rust-target }}/release/$bin"
+            if [ -f "$SRC" ]; then
+              cp "$SRC" "$PKG_DIR/bin/"
+              chmod 755 "$PKG_DIR/bin/$bin"
+            fi
+          done
+          ls -lh "$PKG_DIR/bin/"
+
+      - name: Set version
+        working-directory: dist-${{ matrix.target }}
+        run: |
+          node -e "
+            const p = require('./package.json');
+            p.version = '${{ inputs.version }}';
+            require('fs').writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
+          "
+
+      - name: Publish platform package
+        if: ${{ !inputs.dry-run }}
+        working-directory: dist-${{ matrix.target }}
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Dry-run pack
+        if: ${{ inputs.dry-run }}
+        working-directory: dist-${{ matrix.target }}
+        run: npm pack --dry-run
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: platform-${{ matrix.target }}
+          path: dist-${{ matrix.target }}/
+
+  publish-main:
+    name: Publish main package
+    needs: [build-platform]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Update optionalDependencies versions
+        run: |
+          node -e "
+            const p = require('./package.json');
+            const v = '${{ inputs.version }}';
+            for (const key of Object.keys(p.optionalDependencies || {})) {
+              p.optionalDependencies[key] = v;
+            }
+            p.version = v;
+            require('fs').writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
+          "
+
+      - name: Publish main package
+        if: ${{ !inputs.dry-run }}
+        run: npm publish --access public --ignore-scripts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Dry-run pack
+        if: ${{ inputs.dry-run }}
+        run: npm pack --dry-run
