@@ -12,7 +12,7 @@
 | Hooks | `src/hook.rs` | temporary Claude settings and hook relay script |
 | Transcript replay | `src/transcript.rs`, `src/normalize.rs` | transcript tailing and Claude-like stream-json normalization |
 | Runtime protocol | `src/protocol.rs` | `jaw_runtime` JSONL lifecycle envelope |
-| Packaging | `Cargo.toml`, `package.json`, `bin/`, `scripts/`, `.github/workflows/` | Rust build, `claude-e` alias, npm/npx-safe wrappers, postinstall GitHub star prompt, dry-run/publish/release scripts, local-only npm publish |
+| Packaging | `Cargo.toml`, `package.json`, `bin/`, `scripts/`, `.github/workflows/`, `platform-packages/`, `tests/package-contract.test.cjs` | Rust build, `claude-e` alias, npm/npx-safe wrappers, prebuilt platform packages, postinstall GitHub star prompt, dry-run/publish/release scripts, local-only npm publish |
 
 ## Documents
 
@@ -32,4 +32,4 @@
 - Primary subcommand: `run`
 - Compatibility/semantic alias: `exec`
 - Protocol envelope: `jaw_runtime` for cli-jaw compatibility
-- npm release surface: current-version publish, semver release, preview release, and GitHub Release workflow
+- npm release surface: current-version publish, semver release, preview release, prebuilt platform package publish, and GitHub Release workflow

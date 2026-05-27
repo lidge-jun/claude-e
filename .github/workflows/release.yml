@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to publish (e.g. 0.1.8)'
+        description: 'Version to publish (e.g. 0.1.10)'
         required: true
       dry-run:
         description: 'Dry run (skip npm publish)'
@@ -53,6 +53,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.rust-target }}
+
+      - name: Sync version metadata
+        run: |
+          node scripts/sync-cargo-version.mjs "${{ inputs.version }}"
+          cargo update -p claude-exec --precise "${{ inputs.version }}"
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -113,17 +118,14 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
-      - name: Update optionalDependencies versions
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Update package versions
         run: |
-          node -e "
-            const p = require('./package.json');
-            const v = '${{ inputs.version }}';
-            for (const key of Object.keys(p.optionalDependencies || {})) {
-              p.optionalDependencies[key] = v;
-            }
-            p.version = v;
-            require('fs').writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
-          "
+          node scripts/sync-package-versions.mjs "${{ inputs.version }}"
+          node scripts/sync-cargo-version.mjs "${{ inputs.version }}"
+          cargo update -p claude-exec --precise "${{ inputs.version }}"
+          node --test tests/package-contract.test.cjs
 
       - name: Publish main package
         if: ${{ !inputs.dry-run }}

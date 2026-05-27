@@ -175,6 +175,14 @@ root, execute `target/release/claude-exec` when it exists, and fall back to
 `cargo run` only for source checkouts. Set `CLAUDE_E_SKIP_BUILD=1` or
 `CLAUDE_EXEC_SKIP_BUILD=1` only when another packaging layer provides the binary.
 
+Before falling back to Cargo, postinstall attempts to copy prebuilt binaries from
+the matching optional platform package, for example
+`@bitkyc08/claude-e-darwin-arm64`. The main package version, every
+`optionalDependencies` version, and every `platform-packages/*/package.json`
+version must match. `scripts/sync-package-versions.mjs <version>` updates those
+metadata files, and `tests/package-contract.test.cjs` enforces that the declared
+platform packages and postinstall resolver stay in sync.
+
 Release helpers:
 
 ```bash
@@ -200,3 +208,8 @@ the GitHub release as a prerelease.
 GitHub Actions must not publish to npm. CI only verifies and dry-runs package
 contents; the real npm publish step is intentionally local-only after interactive
 npm authentication.
+
+The release workflow is still the source of platform tarballs: it builds each
+Rust target, publishes each platform package when dry-run is false, updates the
+main package's optional dependencies to the same requested version, runs the
+package contract test, and only then publishes the main package.

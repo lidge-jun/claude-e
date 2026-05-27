@@ -34,7 +34,7 @@
     "postinstall": "node scripts/postinstall.cjs",
     "build": "cargo build --release --locked",
     "test": "cargo test --locked && npm run test:postinstall",
-    "test:postinstall": "node --test tests/star-prompt.test.cjs",
+    "test:postinstall": "node --test tests/*.test.cjs",
     "fmt": "cargo fmt",
     "fmt:check": "cargo fmt --check",
     "check": "cargo check --locked",
@@ -54,10 +54,10 @@
     "install:local": "cargo install --path . --locked"
   },
   "optionalDependencies": {
-    "@bitkyc08/claude-e-darwin-arm64": "0.1.8",
-    "@bitkyc08/claude-e-darwin-x64": "0.1.8",
-    "@bitkyc08/claude-e-linux-x64": "0.1.8",
-    "@bitkyc08/claude-e-linux-arm64": "0.1.8"
+    "@bitkyc08/claude-e-darwin-arm64": "0.1.9",
+    "@bitkyc08/claude-e-darwin-x64": "0.1.9",
+    "@bitkyc08/claude-e-linux-x64": "0.1.9",
+    "@bitkyc08/claude-e-linux-arm64": "0.1.9"
   },
   "files": [
     "bin/",

@@ -314,6 +314,20 @@ When npm is not authenticated, the release scripts start `npm login
 --auth-type=web` so npm can use its normal browser login flow in your local
 terminal before publishing.
 
+### Prebuilt Package Contract
+
+The main `claude-e` package declares one optional platform package per supported
+OS/architecture. The main package version, every `optionalDependencies` version,
+and every `platform-packages/*/package.json` version must match before a release
+is considered publishable. `npm run test:postinstall` checks this contract, and
+`scripts/sync-package-versions.mjs <version>` updates all package metadata for a
+workflow release version.
+
+The GitHub release workflow also syncs Cargo metadata to the requested workflow
+version before building platform packages and before publishing the main package.
+This prevents the main package from pointing at platform package versions that
+were never built.
+
 ## Architecture Docs
 
 - [structure/INDEX.md](structure/INDEX.md)

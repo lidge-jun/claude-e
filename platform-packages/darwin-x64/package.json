@@ -1,10 +1,18 @@
 {
   "name": "@bitkyc08/claude-e-darwin-x64",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Prebuilt claude-e binaries for macOS x64 (Intel)",
   "license": "MIT",
-  "os": ["darwin"],
-  "cpu": ["x64"],
-  "files": ["bin/"],
-  "publishConfig": { "access": "public" }
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "bin/"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }
