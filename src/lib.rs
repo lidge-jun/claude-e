@@ -21,7 +21,14 @@ use args::{Cli, Command};
 use config::RunConfig;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const PROMPT_ACCEPTANCE_TIMEOUT_MS: u64 = 8_000;
+/// Per-attempt window to confirm an injected prompt produced a user/assistant
+/// turn in the transcript before re-injecting. A landed paste registers a turn
+/// within ~2s; a dropped one never does, so this also bounds drop detection.
+const PROMPT_INJECTION_ATTEMPT_TIMEOUT_MS: u64 = 5_000;
+/// How many times to (re-)inject the prompt before giving up. Resume-path pastes
+/// are occasionally dropped while the TUI is still settling; re-injection after a
+/// quiesce recovers them.
+const MAX_PROMPT_INJECTION_ATTEMPTS: u32 = 3;
 
 pub fn main_entry() {
     env_logger::init();
@@ -310,38 +317,7 @@ fn run(config: &RunConfig, prompt_override: Option<String>) -> i32 {
     // Wait for PTY quiescence before injecting prompt
     pty_child.wait_quiescence(500);
 
-    // Inject prompt via bracketed paste, then submit after a short delay
-    let (paste_bytes, submit_bytes) = sanitize::bracketed_paste(&prompt);
-    {
-        let Ok(mut w) = pty_child.writer.lock() else {
-            emit_error(config, "PTY writer lock poisoned before prompt write", 4);
-            cleanup::kill_process_group(child_pid, &config.run_id, config.emit_runtime_events);
-            return 4;
-        };
-        if let Err(e) = w.write_all(&paste_bytes) {
-            emit_error(config, &format!("prompt write failed: {e}"), 4);
-            cleanup::kill_process_group(child_pid, &config.run_id, config.emit_runtime_events);
-            return 4;
-        }
-        let _ = w.flush();
-    }
-    // Brief delay so TUI processes the paste before receiving Enter
-    std::thread::sleep(std::time::Duration::from_millis(150));
-    {
-        let Ok(mut w) = pty_child.writer.lock() else {
-            emit_error(config, "PTY writer lock poisoned before submit write", 4);
-            cleanup::kill_process_group(child_pid, &config.run_id, config.emit_runtime_events);
-            return 4;
-        };
-        if let Err(e) = w.write_all(&submit_bytes) {
-            emit_error(config, &format!("submit write failed: {e}"), 4);
-            cleanup::kill_process_group(child_pid, &config.run_id, config.emit_runtime_events);
-            return 4;
-        }
-        let _ = w.flush();
-    }
-    emit_prompt_injected(config);
-
+    // Verify the transcript path up front — injection cannot be confirmed without it.
     if transcript_path.is_empty() {
         emit_error(
             config,
@@ -353,35 +329,97 @@ fn run(config: &RunConfig, prompt_override: Option<String>) -> i32 {
         return 7;
     }
 
-    match transcript::wait_for_prompt_activity_after_offset(
-        &transcript_path_buf,
-        transcript_start_offset,
-        PROMPT_ACCEPTANCE_TIMEOUT_MS,
-        stop.as_ref(),
-    ) {
-        Ok(true) => {}
-        Ok(false) => {
-            emit_error(
-                config,
-                &format!(
-                    "prompt injection did not reach Claude transcript after {PROMPT_ACCEPTANCE_TIMEOUT_MS}ms"
-                ),
-                7,
-            );
-            cleanup::kill_process_group(child_pid, &config.run_id, config.emit_runtime_events);
-            pty_child.join_drain();
-            return 7;
+    // Inject prompt via bracketed paste, then submit after a short delay.
+    //
+    // On the resume path the injection can be silently dropped: SessionStart fires
+    // once the TUI shell is up, but the resumed session is still settling
+    // asynchronously (conversation title regeneration, file-history snapshot, mode
+    // restore). A paste delivered into that transient state is discarded, so the
+    // prompt never becomes a user turn and the model never responds. opus-4-8's
+    // slower, more variable resume widens this window, so a single blind paste is
+    // unreliable. We verify the prompt produced a turn and re-inject if it did not —
+    // a dropped paste retried after the TUI quiesces lands cleanly.
+    let (paste_bytes, submit_bytes) = sanitize::bracketed_paste(&prompt);
+
+    let mut accepted = false;
+    for attempt in 1..=MAX_PROMPT_INJECTION_ATTEMPTS {
+        if attempt > 1 {
+            // Let the resumed TUI finish settling before re-pasting.
+            pty_child.wait_quiescence(400);
+            log::debug!("re-injecting prompt (attempt {attempt}/{MAX_PROMPT_INJECTION_ATTEMPTS})");
         }
-        Err(e) => {
-            emit_error(
-                config,
-                &format!("prompt injection transcript verification failed: {e}"),
-                7,
-            );
-            cleanup::kill_process_group(child_pid, &config.run_id, config.emit_runtime_events);
-            pty_child.join_drain();
-            return 7;
+
+        {
+            let Ok(mut w) = pty_child.writer.lock() else {
+                emit_error(config, "PTY writer lock poisoned before prompt write", 4);
+                cleanup::kill_process_group(child_pid, &config.run_id, config.emit_runtime_events);
+                return 4;
+            };
+            if let Err(e) = w.write_all(&paste_bytes) {
+                emit_error(config, &format!("prompt write failed: {e}"), 4);
+                cleanup::kill_process_group(child_pid, &config.run_id, config.emit_runtime_events);
+                return 4;
+            }
+            let _ = w.flush();
         }
+        // Brief delay so TUI processes the paste before receiving Enter
+        std::thread::sleep(std::time::Duration::from_millis(150));
+        {
+            let Ok(mut w) = pty_child.writer.lock() else {
+                emit_error(config, "PTY writer lock poisoned before submit write", 4);
+                cleanup::kill_process_group(child_pid, &config.run_id, config.emit_runtime_events);
+                return 4;
+            };
+            if let Err(e) = w.write_all(&submit_bytes) {
+                emit_error(config, &format!("submit write failed: {e}"), 4);
+                cleanup::kill_process_group(child_pid, &config.run_id, config.emit_runtime_events);
+                return 4;
+            }
+            let _ = w.flush();
+        }
+        if attempt == 1 {
+            emit_prompt_injected(config);
+        }
+
+        match transcript::wait_for_prompt_activity_after_offset(
+            &transcript_path_buf,
+            transcript_start_offset,
+            PROMPT_INJECTION_ATTEMPT_TIMEOUT_MS,
+            stop.as_ref(),
+        ) {
+            Ok(true) => {
+                accepted = true;
+                break;
+            }
+            Ok(false) => {
+                // No user/assistant turn yet — the paste was likely dropped while the
+                // resumed TUI was settling. Re-inject on the next iteration.
+                continue;
+            }
+            Err(e) => {
+                emit_error(
+                    config,
+                    &format!("prompt injection transcript verification failed: {e}"),
+                    7,
+                );
+                cleanup::kill_process_group(child_pid, &config.run_id, config.emit_runtime_events);
+                pty_child.join_drain();
+                return 7;
+            }
+        }
+    }
+
+    if !accepted {
+        emit_error(
+            config,
+            &format!(
+                "prompt injection did not reach Claude transcript after {MAX_PROMPT_INJECTION_ATTEMPTS} attempts ({PROMPT_INJECTION_ATTEMPT_TIMEOUT_MS}ms each)"
+            ),
+            7,
+        );
+        cleanup::kill_process_group(child_pid, &config.run_id, config.emit_runtime_events);
+        pty_child.join_drain();
+        return 7;
     }
 
     // Shared activity tracker for idle timeout
