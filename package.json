@@ -1,6 +1,6 @@
 {
   "name": "claude-e",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "PTY-backed exec wrapper for Claude Code with claude -p-compatible CLI and cli-jaw runtime support",
   "keywords": [
     "claude",
@@ -54,10 +54,10 @@
     "install:local": "cargo install --path . --locked"
   },
   "optionalDependencies": {
-    "@bitkyc08/claude-e-darwin-arm64": "0.1.9",
-    "@bitkyc08/claude-e-darwin-x64": "0.1.9",
-    "@bitkyc08/claude-e-linux-x64": "0.1.9",
-    "@bitkyc08/claude-e-linux-arm64": "0.1.9"
+    "@bitkyc08/claude-e-darwin-arm64": "0.1.10",
+    "@bitkyc08/claude-e-darwin-x64": "0.1.10",
+    "@bitkyc08/claude-e-linux-x64": "0.1.10",
+    "@bitkyc08/claude-e-linux-arm64": "0.1.10"
   },
   "files": [
     "bin/",

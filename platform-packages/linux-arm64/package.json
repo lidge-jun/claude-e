@@ -1,6 +1,6 @@
 {
   "name": "@bitkyc08/claude-e-linux-arm64",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Prebuilt claude-e binaries for Linux ARM64",
   "license": "MIT",
   "os": [
