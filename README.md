@@ -4,6 +4,8 @@
 [![npm version](https://img.shields.io/npm/v/claude-e.svg)](https://www.npmjs.com/package/claude-e)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/runtime-Rust-orange.svg)](Cargo.toml)
+[![GitHub stars](https://img.shields.io/github/stars/lidge-jun/claude-e?style=flat&label=stars)](https://github.com/lidge-jun/claude-e)
+[![GitHub Pages ready](https://img.shields.io/badge/GitHub%20Pages-docs%20ready-111827)](docs/index.html)
 
 ![claude-e demo](screenshot.png)
 
@@ -24,6 +26,20 @@ claude-e --tool "use 10 tools and summarize the results"
 claude-e --output-format json "summarize this commit" < commit.diff
 claude-e --output-format stream-json "audit src/" --verbose | jq .
 ```
+
+## Public Surface
+
+| Surface | Link | Status |
+| --- | --- | --- |
+| npm package | [`claude-e`](https://www.npmjs.com/package/claude-e) | public package |
+| Repository | [`lidge-jun/claude-e`](https://github.com/lidge-jun/claude-e) | public source |
+| Docs landing page | [`docs/index.html`](docs/index.html) | local Pages entrypoint, deploys after an authorized push |
+| Runtime contract | [`structure/runtime_contract.md`](structure/runtime_contract.md) | JSONL, transcript, timeout, and exit-code source |
+| CLI surface | [`structure/cli_surface.md`](structure/cli_surface.md) | command aliases, flags, and compatibility names |
+
+GitHub Pages is documented as **ready, not live** in this local state because
+the GitHub Pages API currently returns 404 for this repository. The added Pages
+workflow publishes `/docs` once the owner authorizes a push.
 
 ## Why This Exists
 
@@ -109,6 +125,55 @@ The package currently exposes four bins from the same Rust entrypoint:
 | `claude-exec` | Compatibility | Long descriptive alias retained for existing integrations. |
 | `claude-i` | Transitional | Existing cli-jaw provider/runtime compatibility. |
 | `jaw-claude-i` | Legacy | Existing cli-jaw helper name compatibility. |
+
+## Architecture Snapshot
+
+```text
+agent / orchestrator
+  -> claude-e npm bin
+  -> Rust wrapper
+  -> PTY session
+  -> interactive Claude Code runtime
+  -> normalized text/json/stream-json output
+
+compatibility bins
+  -> claude-exec
+  -> claude-i
+  -> jaw-claude-i
+```
+
+`claude-e` keeps stdout reserved for user-facing output and writes progress,
+resume hints, and wrapper diagnostics to stderr. That separation is the main
+reason it can fit into pipelines, JSON consumers, and cli-jaw runtime adapters.
+
+## Verification Policy
+
+Use these local gates before claiming a release or command-surface change:
+
+```bash
+npm run fmt:check
+npm run check
+npm run test
+npm run publish:dry-run
+npm run verify
+```
+
+Current remote CI signal: the `Tests` workflow is passing on `main` across
+Ubuntu and macOS. Publishing remains manual unless a workflow dispatch is
+explicitly requested.
+
+## Safety Model
+
+- The wrapper preserves the stdout contract so JSON consumers do not receive
+  progress chatter.
+- `--claude-bin` exists for launchd/server environments where PATH is not
+  trustworthy.
+- Timeouts and prompt sanitization have explicit exit codes instead of silent
+  fallbacks.
+- The runtime can enable Claude permission bypass for unattended tool use, so
+  only run it inside workspaces you intend Claude Code to operate on.
+- The npm package is MIT licensed and this repository includes a root
+  [`LICENSE`](LICENSE) file.
 
 ## Print-Compatible Examples
 

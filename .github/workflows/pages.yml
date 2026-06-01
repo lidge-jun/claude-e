@@ -1,0 +1,75 @@
+name: Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Validate docs entrypoint
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const required = [
+            'docs/index.html',
+            'docs/assets/favicon.svg',
+            'docs/assets/social-preview.svg',
+            'README.md',
+            'LICENSE'
+          ];
+          const missing = required.filter((file) => !fs.existsSync(file));
+          if (missing.length) {
+            throw new Error(`Missing required docs files: ${missing.join(', ')}`);
+          }
+          const html = fs.readFileSync('docs/index.html', 'utf8');
+          const checks = [
+            ['canonical', 'https://lidge-jun.github.io/claude-e/'],
+            ['og image', 'https://lidge-jun.github.io/claude-e/assets/social-preview.svg'],
+            ['quickstart', 'npm install -g claude-e'],
+            ['verification', 'npm run publish:dry-run']
+          ];
+          const failures = checks
+            .filter(([, needle]) => !html.includes(needle))
+            .map(([label]) => label);
+          if (failures.length) {
+            throw new Error(`Docs validation failed: ${failures.join(', ')}`);
+          }
+          NODE
+      - name: Git diff whitespace check
+        run: git diff --check
+
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>claude-e - PTY-backed Claude execution</title>
+  <meta name="description" content="PTY-backed claude -p-style executor for Claude Code with JSON, stream-json, timeout, and resume support.">
+  <link rel="canonical" href="https://lidge-jun.github.io/claude-e/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="claude-e">
+  <meta property="og:description" content="A Rust wrapper that turns interactive Claude Code into a predictable single-command execution surface.">
+  <meta property="og:url" content="https://lidge-jun.github.io/claude-e/">
+  <meta property="og:image" content="https://lidge-jun.github.io/claude-e/assets/social-preview.svg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="claude-e">
+  <meta name="twitter:description" content="PTY-backed Claude Code execution with structured output and runtime contracts.">
+  <meta name="twitter:image" content="https://lidge-jun.github.io/claude-e/assets/social-preview.svg">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #160f0a;
+      --panel: #20140d;
+      --panel-2: #2d1b12;
+      --line: #7c2d12;
+      --text: #fff7ed;
+      --muted: #f7c99f;
+      --orange: #fb923c;
+      --amber: #facc15;
+      --green: #22c55e;
+      --max: 1120px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at 74% 20%, rgba(251, 146, 60, .22), transparent 30%), var(--bg);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: rgba(22, 15, 10, .82);
+      border-bottom: 1px solid rgba(251, 146, 60, .18);
+      backdrop-filter: blur(18px);
+    }
+    .nav-inner {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 850;
+      letter-spacing: .04em;
+    }
+    .mark {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      color: var(--amber);
+      background: var(--panel-2);
+      font: 800 15px SFMono-Regular, Menlo, monospace;
+    }
+    .nav-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .nav-links a { text-decoration: none; }
+    .hero {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 86px 24px 58px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.04fr) minmax(320px, .96fr);
+      gap: 42px;
+      align-items: center;
+    }
+    .eyebrow {
+      color: var(--orange);
+      font-size: 13px;
+      font-weight: 850;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: 14px 0 20px;
+      font-size: clamp(46px, 7vw, 84px);
+      line-height: .96;
+      letter-spacing: 0;
+    }
+    .hero p {
+      max-width: 650px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 20px;
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 30px;
+    }
+    .button {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      padding: 0 16px;
+      border-radius: 8px;
+      border: 1px solid rgba(251, 146, 60, .28);
+      text-decoration: none;
+      font-weight: 750;
+      background: #fff7ed;
+      color: #1b1009;
+    }
+    .button.secondary {
+      background: transparent;
+      color: var(--text);
+    }
+    .terminal {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      overflow: hidden;
+      background: rgba(32, 20, 13, .9);
+      box-shadow: 0 28px 70px rgba(0, 0, 0, .42);
+    }
+    .terminal-head {
+      display: flex;
+      gap: 9px;
+      padding: 14px 16px;
+      background: var(--panel-2);
+      border-bottom: 1px solid rgba(251, 146, 60, .16);
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .red { background: #ef4444; }
+    .yellow { background: #f59e0b; }
+    .green { background: var(--green); }
+    pre {
+      margin: 0;
+      padding: 24px;
+      overflow-x: auto;
+      color: #fed7aa;
+      font: 14px/1.66 SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    .section {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 42px 24px;
+    }
+    h2 {
+      margin: 0 0 20px;
+      font-size: 32px;
+      letter-spacing: 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .card {
+      border: 1px solid rgba(251, 146, 60, .18);
+      border-radius: 8px;
+      padding: 20px;
+      background: rgba(45, 27, 18, .72);
+    }
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 18px;
+    }
+    .card p, .section p {
+      color: var(--muted);
+      margin: 0;
+    }
+    .split {
+      display: grid;
+      grid-template-columns: minmax(0, .9fr) minmax(320px, 1.1fr);
+      gap: 24px;
+      align-items: start;
+    }
+    .list {
+      display: grid;
+      gap: 10px;
+      padding: 0;
+      margin: 0;
+      list-style: none;
+    }
+    .list li {
+      border: 1px solid rgba(251, 146, 60, .16);
+      border-radius: 8px;
+      padding: 12px 14px;
+      background: rgba(45, 27, 18, .52);
+      color: var(--muted);
+    }
+    footer {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 36px 24px 54px;
+      color: var(--muted);
+      border-top: 1px solid rgba(251, 146, 60, .14);
+    }
+    @media (max-width: 860px) {
+      .hero, .split { grid-template-columns: 1fr; }
+      .grid { grid-template-columns: 1fr; }
+      .nav-inner { align-items: flex-start; flex-direction: column; }
+      h1 { font-size: 50px; }
+    }
+    @media (max-width: 440px) {
+      .hero { padding-top: 54px; }
+      h1 { font-size: 40px; }
+      .hero p { font-size: 17px; }
+      pre { font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="nav" aria-label="Primary">
+    <div class="nav-inner">
+      <div class="brand"><span class="mark">ce</span><span>CLAUDE-E</span></div>
+      <div class="nav-links">
+        <a href="#why">Why</a>
+        <a href="#runtime">Runtime</a>
+        <a href="#verification">Verification</a>
+        <a href="https://github.com/lidge-jun/claude-e">GitHub</a>
+      </div>
+    </div>
+  </nav>
+  <main>
+    <section class="hero">
+      <div>
+        <div class="eyebrow">Rust PTY wrapper</div>
+        <h1>Claude Code, shaped for agent runtimes.</h1>
+        <p>claude-e gives orchestrators a claude -p-style command while still driving the real interactive Claude Code runtime through a PTY.</p>
+        <div class="actions">
+          <a class="button" href="https://www.npmjs.com/package/claude-e">Install from npm</a>
+          <a class="button secondary" href="https://github.com/lidge-jun/claude-e/blob/main/README.md">Read the README</a>
+        </div>
+      </div>
+      <div class="terminal" aria-label="claude-e quickstart terminal">
+        <div class="terminal-head"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+        <pre><code>npm install -g claude-e
+claude-e "summarize this repo"
+git diff --cached | claude-e \
+  --output-format json \
+  "summarize this staged diff"
+claude-e --output-format stream-json \
+  "audit src/" --verbose | jq .</code></pre>
+      </div>
+    </section>
+
+    <section class="section" id="why">
+      <h2>One command surface for interactive Claude.</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>PTY-backed</h3>
+          <p>Runs the interactive Claude Code path instead of pretending the CLI is a hidden API.</p>
+        </article>
+        <article class="card">
+          <h3>Structured output</h3>
+          <p>Supports text, json, and stream-json while keeping wrapper diagnostics away from stdout.</p>
+        </article>
+        <article class="card">
+          <h3>Runtime contracts</h3>
+          <p>Timeouts, prompt sanitization, resume metadata, and exit codes are documented and testable.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section split" id="runtime">
+      <div>
+        <h2>Compatibility without hiding the contract.</h2>
+        <p>The short `claude-e` bin is primary, while `claude-exec`, `claude-i`, and `jaw-claude-i` remain intentional compatibility aliases for cli-jaw migration.</p>
+      </div>
+      <div class="terminal">
+        <pre><code>printf 'Say hello.\n' | claude-e run \
+  --jsonl \
+  --output-format stream-json \
+  --idle-timeout-ms 600000 \
+  --claude-bin "$(command -v claude)" \
+  -- --model opus</code></pre>
+      </div>
+    </section>
+
+    <section class="section" id="verification">
+      <h2>Release checks are explicit.</h2>
+      <ul class="list">
+        <li><strong>Rust format and compile:</strong> <code>npm run fmt:check</code> and <code>npm run check</code>.</li>
+        <li><strong>Contract tests:</strong> <code>npm run test</code> covers Rust tests and npm package contracts.</li>
+        <li><strong>Publish surface:</strong> <code>npm run publish:dry-run</code> verifies the package contents before release.</li>
+        <li><strong>Remote Pages state:</strong> this page is a local Pages entrypoint until an authorized push deploys `/docs`.</li>
+      </ul>
+    </section>
+  </main>
+  <footer>
+    <p>claude-e is a public project by lidge-jun. It is MIT licensed and designed for explicit, auditable agent execution boundaries.</p>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">claude-e social preview</title>
+  <desc id="desc">PTY-backed Claude Code execution wrapper with structured output.</desc>
+  <rect width="1200" height="630" fill="#160f0a"/>
+  <path d="M0 460c214-68 390-78 590-35 224 48 408 21 610-62v267H0Z" fill="#2a1a10"/>
+  <rect x="76" y="74" width="1048" height="482" rx="34" fill="#20140d" stroke="#7c2d12" stroke-width="2"/>
+  <rect x="116" y="116" width="968" height="72" rx="20" fill="#2d1b12"/>
+  <circle cx="154" cy="152" r="10" fill="#ef4444"/>
+  <circle cx="188" cy="152" r="10" fill="#f59e0b"/>
+  <circle cx="222" cy="152" r="10" fill="#22c55e"/>
+  <text x="270" y="160" fill="#fed7aa" font-family="SFMono-Regular, Menlo, monospace" font-size="22">claude-e --output-format stream-json</text>
+  <text x="126" y="266" fill="#fb923c" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="800">CLAUDE-E</text>
+  <text x="126" y="336" fill="#fff7ed" font-family="Inter, Arial, sans-serif" font-size="64" font-weight="850">PTY-backed Claude</text>
+  <text x="126" y="408" fill="#fff7ed" font-family="Inter, Arial, sans-serif" font-size="64" font-weight="850">execution wrapper</text>
+  <text x="130" y="464" fill="#fed7aa" font-family="Inter, Arial, sans-serif" font-size="27">One command in, structured text/json/stream-json out.</text>
+  <g transform="translate(762 260)">
+    <rect width="260" height="156" rx="20" fill="#120b07" stroke="#9a3412"/>
+    <text x="26" y="48" fill="#fdba74" font-family="SFMono-Regular, Menlo, monospace" font-size="18">&gt; runtime_started</text>
+    <text x="26" y="86" fill="#fde68a" font-family="SFMono-Regular, Menlo, monospace" font-size="18">&gt; assistant_delta</text>
+    <text x="26" y="124" fill="#86efac" font-family="SFMono-Regular, Menlo, monospace" font-size="18">&gt; result</text>
+  </g>
+</svg>
